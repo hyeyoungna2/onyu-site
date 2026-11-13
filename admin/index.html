@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>온유 관리자</title>
+<style>
+:root { --ink:#3F3A55; --soft:#7A7490; --violet:#5E5680; --line:#E6E1EF; --bg:#F6F4FA; --card:#fff; --red:#C96C6C; --green:#5E9E6E; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif; background:var(--bg); color:var(--ink); }
+header { background:var(--card); border-bottom:1px solid var(--line); padding:14px 20px; display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:2; }
+header h1 { font-size:16px; margin:0; flex:1; }
+header .who { font-size:12px; color:var(--soft); }
+main { max-width:960px; margin:0 auto; padding:20px 16px 60px; }
+button { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:10px; padding:8px 14px; cursor:pointer; }
+button.main { background:var(--violet); color:#fff; border-color:var(--violet); }
+button.red { color:var(--red); }
+button:disabled { opacity:.5; cursor:default; }
+.tabs { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+.tabs button.on { background:var(--violet); color:#fff; border-color:var(--violet); }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+.stat { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
+.stat b { display:block; font-size:24px; margin-top:4px; }
+.stat span { font-size:12px; color:var(--soft); }
+.card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:10px; }
+.card .top { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+.card .top b { font-size:14px; }
+.meta { font-size:12px; color:var(--soft); }
+.content { margin:10px 0; padding:10px 12px; background:var(--bg); border-radius:10px; white-space:pre-wrap; word-break:break-word; font-size:14px; }
+.row { display:flex; gap:6px; flex-wrap:wrap; }
+.pill { font-size:11px; padding:2px 8px; border-radius:20px; background:var(--bg); color:var(--soft); }
+.pill.open { background:#FBE9E9; color:var(--red); }
+.pill.done { background:#E7F3EA; color:var(--green); }
+table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; font-size:13px; }
+th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; word-break:break-word; }
+th { font-size:12px; color:var(--soft); font-weight:500; background:var(--bg); }
+.center { text-align:center; padding:60px 20px; }
+.center p { color:var(--soft); }
+.empty { color:var(--soft); text-align:center; padding:30px; }
+h2 { font-size:14px; margin:22px 0 10px; color:var(--soft); font-weight:500; }
+.note { font-size:12px; color:var(--soft); margin-top:14px; }
+</style>
+</head>
+<body>
+<header><h1>온유 관리자</h1><span class="who" id="who"></span><button id="out" hidden>로그아웃</button></header>
+<main id="app"><div class="center"><p>불러오는 중…</p></div></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+// 서버 비밀키는 없다: 공개 키 + 로그인한 관리자 계정. 보이는 것과 처리는 모두 서버가 관리자인지 확인한 뒤에만 된다.
+const sb = supabase.createClient('https://gwkzhdafsgimmrwwfkop.supabase.co', 'sb_publishable_w8ZHKCAmFYeeVDt8-yrt1Q_smuB2X8e');
+const $app = document.getElementById('app');
+const KIND = { memorial:'비석', guestbook:'방명록', reply:'방명록 답글', user:'광장의 사람', post:'게시판 글', comment:'게시판 댓글' };
+const STATUS = { open:'처리 전', hidden:'가림', dismissed:'문제없음' };
+let tab = 'stats';
+
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) { if (k === 'onclick') e.onclick = v; else if (k === 'class') e.className = v; else if (v !== undefined && v !== null) e.setAttribute(k, v); }
+  for (const k of kids.flat()) if (k !== null && k !== undefined) e.append(k instanceof Node ? k : document.createTextNode(String(k)));
+  return e;
+}
+const when = t => t ? new Date(t).toLocaleString('ko-KR', { timeZone:'Asia/Seoul', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+const mb = b => b >= 1073741824 ? (b / 1073741824).toFixed(2) + ' GB' : (b / 1048576).toFixed(1) + ' MB';
+
+function login(msg) {
+  document.getElementById('out').hidden = true; document.getElementById('who').textContent = '';
+  $app.replaceChildren(el('div', { class:'center' },
+    el('p', {}, msg || '관리자 계정(onyu.help@gmail.com)으로 로그인해 주세요.'),
+    el('button', { class:'main', onclick: () => sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: location.origin + '/admin/', queryParams:{ prompt:'select_account' } } }) }, 'Google로 로그인')));
+}
+
+async function start() {
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) return login();
+  document.getElementById('who').textContent = session.user.email || '';
+  const out = document.getElementById('out'); out.hidden = false; out.onclick = async () => { await sb.auth.signOut(); login(); };
+  const { data:ok, error } = await sb.rpc('is_admin');
+  if (error || !ok) { await sb.auth.signOut(); return login('이 계정은 관리자가 아니에요. onyu.help@gmail.com 으로 로그인해 주세요.'); }
+  render();
+}
+
+async function render() {
+  const tabs = el('div', { class:'tabs' }, [['stats','현황'], ['reports','신고'], ['errors','앱 오류']].map(([k, n]) =>
+    el('button', { class: tab === k ? 'on' : '', onclick: () => { tab = k; render(); } }, n)), el('button', { onclick: render }, '새로고침'));
+  const body = el('div', {}, el('p', { class:'meta' }, '불러오는 중…'));
+  $app.replaceChildren(tabs, body);
+  try { body.replaceChildren(await (tab === 'stats' ? stats() : tab === 'reports' ? reports() : errors())); }
+  catch (e) { body.replaceChildren(el('p', { class:'empty' }, '불러오지 못했어요: ' + (e.message || e))); }
+}
+
+async function stats() {
+  const { data:s, error } = await sb.rpc('admin_stats'); if (error) throw error;
+  const box = (n, v) => el('div', { class:'stat' }, el('span', {}, n), el('b', {}, v));
+  return el('div', {},
+    el('div', { class:'grid' },
+      box('회원', s.members), box('오늘 가입', s.new_today), box('오늘 들어온 사람', s.active_today), box('둘러보기(손님)', s.guests),
+      box('온유 플러스', s.plus), box('플러스 (샌드박스)', s.plus_sandbox),
+      box('반려동물', s.pets), box('정원의 비석', s.memorials), box('게시판 글', s.posts),
+      box('사진·영상 용량', mb(s.storage_bytes)), box('영상', s.videos), box('푸시 받는 폰', s.push_devices),
+      box('처리 전 신고', s.open_reports), box('앱 오류 (24시간)', s.errors_24h)),
+    el('p', { class:'note' }, '기준 시각 ' + when(s.now) + ' · 관리자 계정은 회원 수에서 빠져요. Supabase 무료 요금제의 저장 공간은 프로젝트 전체 1GB예요.'));
+}
+
+async function reports() {
+  const { data, error } = await sb.rpc('admin_reports'); if (error) throw error;
+  const open = data.filter(r => r.status === 'open'), done = data.filter(r => r.status !== 'open');
+  const act = async (r, a, btn) => {
+    btn.disabled = true;
+    const { error } = await sb.rpc('admin_act', { p_report: r.id, p_action: a });
+    if (error) { alert('처리하지 못했어요: ' + error.message); btn.disabled = false; return; }
+    render();
+  };
+  const card = r => {
+    const btns = r.status === 'open' ? el('div', { class:'row' },
+      r.target_type !== 'user' ? el('button', { class:'red', onclick: e => act(r, 'hide', e.target) }, '가리기') : null,
+      r.target_type !== 'user' ? el('button', { onclick: e => act(r, 'restore', e.target) }, '다시 보이기') : null,
+      el('button', { onclick: e => act(r, 'dismiss', e.target) }, '문제없음')) : null;
+    return el('div', { class:'card' },
+      el('div', { class:'top' }, el('b', {}, '#' + r.id + ' · ' + (KIND[r.target_type] || r.target_type)),
+        el('span', { class:'pill ' + (r.status === 'open' ? 'open' : 'done') }, STATUS[r.status] || r.status),
+        el('span', { class:'meta' }, when(r.created_at) + (r.reporters ? ' · 신고 ' + r.reporters + '명' : '') + (r.handled_at ? ' · 처리 ' + when(r.handled_at) : ''))),
+      r.content ? el('div', { class:'content' }, r.content) : null,
+      r.reason ? el('p', { class:'meta' }, '사유: ' + r.reason) : null,
+      btns);
+  };
+  return el('div', {},
+    el('h2', {}, '처리 전 ' + open.length + '건'),
+    open.length ? open.map(card) : el('p', { class:'empty' }, '처리할 신고가 없어요.'),
+    el('p', { class:'note' }, '게시판 글·댓글·방명록은 신고 1건이면 이미 가려져 있어요(비석은 3명). 오해였다면 "다시 보이기", 그대로 둘 거면 "가리기"를 눌러 마무리해요.'),
+    el('h2', {}, '최근 30일 처리'),
+    done.length ? done.map(card) : el('p', { class:'empty' }, '없어요.'));
+}
+
+async function errors() {
+  const { data, error } = await sb.rpc('admin_errors', { p_days: 7 }); if (error) throw error;
+  if (!data.length) return el('div', {}, el('p', { class:'empty' }, '최근 7일 동안 앱 오류가 없어요.'),
+    el('p', { class:'note' }, '앱이 튕긴 것(크래시)은 여기 오지 않아요: Xcode → Window → Organizer → Crashes 에서 봐요.'));
+  return el('div', {},
+    el('table', {}, el('tr', {}, ['종류', '내용', '횟수', '사람', '마지막', '앱·OS'].map(h => el('th', {}, h))),
+      data.map(e => el('tr', {}, el('td', {}, e.kind), el('td', {}, e.message || ''), el('td', {}, e.count), el('td', {}, e.users), el('td', {}, when(e.last_at)), el('td', {}, [e.app_ver, e.os].filter(Boolean).join(' · '))))),
+    el('p', { class:'note' }, '최근 7일, 같은 오류끼리 묶었어요. 앱이 튕긴 것(크래시)은 Xcode Organizer 에서 봐요.'));
+}
+
+sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' && location.hash.includes('access_token')) history.replaceState(null, '', location.pathname); });
+start();
+</script>
+</body>
+</html>
