@@ -65,9 +65,18 @@ const mb = b => b >= 1073741824 ? (b / 1073741824).toFixed(2) + ' GB' : (b / 104
 
 function login(msg) {
   document.getElementById('out').hidden = true; document.getElementById('who').textContent = '';
-  $app.replaceChildren(el('div', { class:'center' },
-    el('p', {}, msg || '관리자 계정(onyu.help@gmail.com)으로 로그인해 주세요.'),
-    el('button', { class:'main', onclick: () => sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: location.origin + '/admin/', queryParams:{ prompt:'select_account' } } }) }, 'Google로 로그인')));
+  const mail = el('input', { type:'email', value:'onyu.help@gmail.com', autocomplete:'username', style:'width:100%;max-width:300px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;margin:4px 0' });
+  const pw = el('input', { type:'password', placeholder:'비밀번호', autocomplete:'current-password', style:'width:100%;max-width:300px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;margin:4px 0' });
+  const go = el('button', { class:'main', type:'submit', style:'margin-top:8px' }, '로그인');
+  const form = el('form', { class:'center' }, el('p', {}, msg || '관리자 계정으로 로그인해 주세요.'), mail, el('br'), pw, el('br'), go);
+  form.onsubmit = async (e) => {
+    e.preventDefault(); go.disabled = true;
+    const { error } = await sb.auth.signInWithPassword({ email: mail.value.trim(), password: pw.value });
+    go.disabled = false;
+    if (error) { pw.value = ''; form.querySelector('p').textContent = error.message.includes('confirm') ? '메일 인증이 아직 안 됐어요.' : '메일이나 비밀번호가 맞지 않아요.'; return; }
+    start();
+  };
+  $app.replaceChildren(form);
 }
 
 async function start() {
@@ -142,7 +151,6 @@ async function errors() {
     el('p', { class:'note' }, '최근 7일, 같은 오류끼리 묶었어요. 앱이 튕긴 것(크래시)은 Xcode Organizer 에서 봐요.'));
 }
 
-sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' && location.hash.includes('access_token')) history.replaceState(null, '', location.pathname); });
 start();
 </script>
 </body>
