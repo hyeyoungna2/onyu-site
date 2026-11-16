@@ -227,7 +227,7 @@ async function start() {
   who = session.user.email || '';
   const { data:ok, error } = await sb.rpc('is_admin');
   if (error || !ok) { await sb.auth.signOut(); return login('이 계정은 관리자가 아니에요. onyu.help@gmail.com 으로 로그인해 주세요.'); }
-  render();
+  ready = true; fromHash(); render(true);
 }
 
 function shell(title, body, extra) {
@@ -239,13 +239,37 @@ function shell(title, body, extra) {
     el('a', { class:'nav', href:'https://mail.google.com/mail/u/?authuser=onyu.help@gmail.com', target:'_blank', rel:'noopener' },
       svg('<path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/>'), '문의 메일함', el('span', { class:'ext' }, '↗')),
     el('div', { class:'grow', style:'flex:1' }),
-    el('div', { class:'me' }, el('span', {}, who), el('button', { onclick: async () => { await sb.auth.signOut(); login(); } }, '로그아웃')));
-  const refresh = el('button', { class:'btn', onclick: render }, svg('<path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/>', 14, 1.8), '새로고침');
+    el('div', { class:'me' }, el('span', {}, who), el('button', { onclick: async () => { await sb.auth.signOut(); ready = false; history.replaceState(null, '', location.pathname); login(); } }, '로그아웃')));
+  const refresh = el('button', { class:'btn', onclick: () => render(true) }, svg('<path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/>', 14, 1.8), '새로고침');
   const head = el('div', { class:'head' }, typeof title === 'string' ? el('h1', {}, title) : title, el('div', { class:'r' }, extra || null, refresh));
   $app.replaceChildren(el('div', { class:'wrap' }, aside, el('main', {}, head, body)));
 }
 
-async function render() {
+// 화면마다 주소(#...)를 붙여서 뒤로 가기·새로고침·링크가 그 화면을 기억한다
+let ready = false;
+function toHash() {
+  if (tab === 'members') return openMember ? '#member/' + openMember : '#members/' + memFilter;
+  if (tab === 'subs') return '#subs/' + (subsEnv === 'Sandbox' ? 'sandbox' : 'live');
+  if (tab === 'reports') return openReport ? '#report/' + openReport : '#reports/' + repFilter;
+  if (tab === 'errors') return openError ? '#error/' + encodeURIComponent(openError.kind) + '/' + encodeURIComponent(openError.message) : '#errors/' + errDays;
+  return '';
+}
+function fromHash() {
+  const [k, a, b] = location.hash.replace(/^#/, '').split('/');
+  tab = 'stats'; openMember = null; openReport = null; openError = null;
+  if (k === 'members') { tab = 'members'; memFilter = ['all', 'today', 'plus', 'guest'].includes(a) ? a : 'all'; }
+  else if (k === 'member' && a) { tab = 'members'; openMember = a; }
+  else if (k === 'subs') { tab = 'subs'; subsEnv = a === 'sandbox' ? 'Sandbox' : 'Production'; }
+  else if (k === 'reports') { tab = 'reports'; repFilter = ['open', 'done', 'all'].includes(a) ? a : 'open'; }
+  else if (k === 'report' && /^\d+$/.test(a || '')) { tab = 'reports'; openReport = Number(a); }
+  else if (k === 'errors') { tab = 'errors'; errDays = [1, 7, 90].includes(Number(a)) ? Number(a) : 1; }
+  else if (k === 'error' && a != null) { tab = 'errors'; openError = { kind: decodeURIComponent(a), message: decodeURIComponent(b || '') }; }
+}
+window.addEventListener('popstate', () => { if (ready) { fromHash(); render(true); } });
+
+async function render(fromHistory) {
+  const h = toHash();
+  if (!fromHistory && (location.hash || '') !== h) history.pushState(null, '', h || location.pathname + location.search);
   const title = tab === 'stats' ? '현황' : tab === 'errors' ? (openError ? '오류 상세' : '앱 오류') : tab === 'members' ? '회원' : tab === 'subs' ? '구독' : openReport ? '신고 처리' : '신고';
   shell(title, el('p', { class:'note' }, '불러오는 중…'));
   try {
