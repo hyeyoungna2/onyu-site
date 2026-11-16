@@ -118,7 +118,20 @@ thead tr { border:0; }
 .opt.on .radio { border:5px solid var(--violet); }
 .side textarea { height:84px; border-radius:12px; border:1px solid var(--line); padding:12px 14px; font-size:13px; resize:none; outline:none; color:var(--ink); }
 .btn.big { height:46px; justify-content:center; font-size:14px; font-weight:500; border-radius:12px; }
+.clickrow { cursor:pointer; } .clickrow:hover .k { color:var(--violet); }
+.crumb { display:flex; align-items:baseline; gap:12px; } .crumb h1 { margin:0; font-size:22px; font-weight:500; } .crumb .slash { color:var(--bar); }
+.search { height:36px; width:240px; display:flex; align-items:center; gap:8px; padding:0 12px; border-radius:10px; background:#fff; border:1px solid var(--line); color:#B3AEC4; }
+.search input { border:0; outline:none; flex:1; min-width:0; font-size:13px; color:var(--ink); background:none; }
+.av { display:inline-block; width:28px; height:28px; border-radius:50%; vertical-align:middle; margin-right:10px; flex:none; }
+.av.big { width:36px; height:36px; margin:0; }
+.kv { display:flex; justify-content:space-between; gap:16px; min-height:46px; align-items:center; border-bottom:1px solid var(--row); font-size:14px; }
+.kv > span:last-child { text-align:right; word-break:break-all; }
+.pet { display:flex; align-items:center; gap:12px; min-height:56px; border-bottom:1px solid var(--row); }
+.pet .col { display:flex; flex-direction:column; font-size:14px; }
+.pet small { font-size:12px; }
 @media (max-width:860px) {
+  .tablebox th, .tablebox td { white-space:nowrap; } .ell { max-width:200px; }
+  .search { width:100%; } .head .r { flex-wrap:wrap; }
   .detail { grid-template-columns:1fr; }
   .wrap { flex-direction:column; }
   aside { width:auto; flex-direction:row; flex-wrap:wrap; align-items:center; padding:14px 16px; gap:6px; border-right:0; border-bottom:1px solid var(--line); }
@@ -149,7 +162,7 @@ const ICON = {
   errors:'<path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18.6A2 2 0 0 0 3.5 21.6h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
 };
 const $app = document.getElementById('app');
-let tab = 'stats', who = '', counts = { open_reports: 0, errors_24h: 0 }, repFilter = 'open', openReport = null;
+let tab = 'stats', who = '', counts = { open_reports: 0, errors_24h: 0 }, repFilter = 'open', openReport = null, memFilter = 'all', memQ = '', openMember = null;
 
 function el(tag, attrs, ...kids) {
   const e = document.createElement(tag);
@@ -202,7 +215,7 @@ async function start() {
 }
 
 function shell(title, body, extra) {
-  const nav = (k, name, n) => el('button', { class:'nav' + (tab === k ? ' on' : ''), onclick: () => { tab = k; openReport = null; render(); } },
+  const nav = (k, name, n) => el('button', { class:'nav' + (tab === k || (k === 'stats' && tab === 'members') ? ' on' : ''), onclick: () => { tab = k; openReport = null; openMember = null; render(); } },
     svg(ICON[k]), name, n ? el('span', { class:'count' }, n) : null);
   const aside = el('aside', {},
     el('div', { class:'brand' }, el('img', { src:'logo.png', alt:'ONYU' }), el('span', {}, '관리자')),
@@ -210,16 +223,18 @@ function shell(title, body, extra) {
     el('div', { class:'grow', style:'flex:1' }),
     el('div', { class:'me' }, el('span', {}, who), el('button', { onclick: async () => { await sb.auth.signOut(); login(); } }, '로그아웃')));
   const refresh = el('button', { class:'btn', onclick: render }, svg('<path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/>', 14, 1.8), '새로고침');
-  const head = el('div', { class:'head' }, el('h1', {}, title), el('div', { class:'r' }, extra || null, refresh));
+  const head = el('div', { class:'head' }, typeof title === 'string' ? el('h1', {}, title) : title, el('div', { class:'r' }, extra || null, refresh));
   $app.replaceChildren(el('div', { class:'wrap' }, aside, el('main', {}, head, body)));
 }
 
 async function render() {
-  const title = tab === 'stats' ? '현황' : tab === 'errors' ? '앱 오류' : openReport ? '신고 처리' : '신고';
+  const title = tab === 'stats' ? '현황' : tab === 'errors' ? '앱 오류' : tab === 'members' ? '회원' : openReport ? '신고 처리' : '신고';
   shell(title, el('p', { class:'note' }, '불러오는 중…'));
   try {
-    const [body, extra] = await (tab === 'stats' ? stats() : tab === 'errors' ? errors() : openReport ? reportDetail(openReport) : reports());
-    shell(title, body, extra);
+    const [body, extra, head] = await (tab === 'stats' ? stats() : tab === 'errors' ? errors() : tab === 'members' ? (openMember ? memberDetail(openMember) : members())
+      : openReport ? reportDetail(openReport) : reports());
+    shell(head || title, body, extra);
+    if (tab === 'members' && !openMember && memFocus) { const i = document.querySelector('.search input'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
   } catch (e) {
     shell(title, el('div', { class:'panel empty' }, '불러오지 못했어요: ' + (e.message || e)));
   }
@@ -229,9 +244,10 @@ async function stats() {
   const [{ data:s, error }, ov] = await Promise.all([sb.rpc('admin_stats'), sb.rpc('admin_overview')]);
   if (error) throw error;
   counts = { open_reports: s.open_reports, errors_24h: s.errors_24h };
-  const row = (k, v, sub, go) => el('div', { class:'row' },
+  const row = (k, v, sub, go) => el('div', { class:'row' + (typeof go === 'function' ? ' clickrow' : ''), onclick: typeof go === 'function' ? go : null },
     el('span', { class:'k' }, k, sub ? el('small', {}, ' ' + sub) : null),
-    el('span', { class:'v' + (go ? ' link' : ''), onclick: go ? () => { tab = go; render(); } : null }, v));
+    el('span', { class:'v' + (typeof go === 'string' ? ' link' : ''), onclick: typeof go === 'string' ? () => { tab = go; render(); } : null }, v));
+  const mem = f => () => { tab = 'members'; memFilter = f; memQ = ''; openMember = null; render(); };
   const sec = (h, ...rows) => el('section', {}, el('h2', {}, h), ...rows);
   const [n, unit] = size(s.storage_bytes);
   const pct = s.storage_bytes / STORAGE.bytes * 100;
@@ -241,9 +257,9 @@ async function stats() {
     el('div', { class:'meter' + (pct >= 80 ? ' warn' : '') }, el('div', { style:`width:${Math.min(pct, 100)}%` })),
     el('span', { class:'pct' }, (pct < 0.1 && pct > 0 ? '0.1% 미만' : pct.toFixed(1) + '%') + ' 사용' + (pct >= 80 ? ' · 곧 가득 차요' : '')));
   const grid = el('div', { class:'panel stats' },
-    sec('사용자', row('회원', s.members, '관리자 제외'), row('오늘 가입', s.new_today), row('오늘 방문', s.active_today), row('둘러보기(손님)', s.guests)),
+    sec('사용자', row('회원', s.members, '관리자 제외', mem('all')), row('오늘 가입', s.new_today, null, mem('today')), row('오늘 방문', s.active_today), row('둘러보기(손님)', s.guests, null, mem('guest'))),
     sec('기록', row('반려동물', s.pets), row('정원의 비석', s.memorials), row('게시판 글', s.posts), row('영상', s.videos)),
-    sec('구독', row('온유 플러스', s.plus, '이용 중'), row('플러스 (샌드박스)', s.plus_sandbox, '테스트 결제'), row('푸시 받는 폰', s.push_devices)),
+    sec('구독', row('온유 플러스', s.plus, '이용 중', mem('plus')), row('플러스 (샌드박스)', s.plus_sandbox, '테스트 결제', mem('plus')), row('푸시 받는 폰', s.push_devices)),
     sec('처리할 일', row('처리 전 신고', s.open_reports, null, 'reports'), row('앱 오류', s.errors_24h, '24시간', 'errors'), store));
 
   let chart, recent;
@@ -358,6 +374,73 @@ async function reportDetail(id) {
         el('div', {}, el('span', { class:'badge ' + cls }, label), d.handled_at ? el('span', { class:'sub', style:'margin-left:8px' }, stamp(d.handled_at)) : null),
         d.note ? el('div', { class:'quote' }, el('p', {}, d.note)) : el('p', { class:'note' }, '메모 없음'));
   return [el('div', { class:'detail' }, el('div', { class:'col' }, content, author), side), back];
+}
+
+const PROVIDER = { apple:'Apple', google:'Google', kakao:'카카오', email:'이메일', guest:'둘러보기 (손님)' };
+const PLAN = { plus:['온유 플러스','b-plum'], sandbox:['플러스 (테스트)','b-wait'], free:['무료','b-skip'] };
+const TINTS = ['#DCE6F5', '#F3E6CF', '#E6DFF3', '#F7CFC3', '#DCEFE3', '#F5DCE8'];
+const tint = id => TINTS[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % TINTS.length];
+let memFocus = false, memTimer = null;
+const crumb = (label, go, title, count) => el('div', { class:'crumb' }, el('button', { class:'linkbtn soft', onclick: go }, label), el('span', { class:'slash' }, '/'),
+  el('h1', {}, title), count != null ? el('span', { class:'sub', style:'font-size:14px' }, count) : null);
+
+async function members() {
+  const { data, error } = await sb.rpc('admin_members', { p_filter: memFilter, p_q: memQ || null });
+  if (error) throw error;
+  const go = id => { openMember = id; memFocus = false; render(); };
+  const seg = el('div', { class:'seg' }, [['all', '전체'], ['today', '오늘 가입'], ['plus', '온유 플러스'], ['guest', '둘러보기']].map(([k, n]) =>
+    el('button', { class: memFilter === k ? 'on' : '', onclick: () => { memFilter = k; memFocus = false; render(); } }, n)));
+  const input = el('input', { type:'search', placeholder:'이름·메일 검색', value: memQ });
+  input.oninput = () => { clearTimeout(memTimer); memTimer = setTimeout(() => { memQ = input.value; memFocus = true; render(); }, 350); };
+  const search = el('label', { class:'search' }, svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>', 15, 1.8), input);
+  const rows = data.map(m => {
+    const [pl, pc] = PLAN[m.plan] || PLAN.free;
+    return el('tr', { class:'click', onclick: () => go(m.id) },
+      el('td', {}, el('span', { class:'av', style:`background:${tint(m.id)}` }), m.name || el('span', { class:'sub' }, m.provider === 'guest' ? '손님' : '(닉네임 없음)')),
+      el('td', { class:'ell' }, m.email || el('span', { class:'sub' }, '—')),
+      el('td', { class:'sub' }, new Date(m.created_at).toLocaleDateString('ko-KR', { ...KST, month:'numeric', day:'numeric' })),
+      el('td', { class:'sub' }, m.last_seen ? ago(m.last_seen) : '—'),
+      el('td', {}, m.pets),
+      el('td', {}, el('span', { class:'badge ' + pc }, pl)),
+      el('td', { style:'text-align:right' }, el('button', { class:'linkbtn', onclick: e => { e.stopPropagation(); go(m.id); } }, '보기')));
+  });
+  const empty = memQ ? `"${memQ}"에 맞는 회원이 없어요.` : { all:'아직 회원이 없어요.', today:'오늘 가입한 회원이 없어요.', plus:'온유 플러스를 쓰는 회원이 없어요.', guest:'둘러보기 중인 손님이 없어요.' }[memFilter];
+  const body = rows.length ? el('div', { class:'panel tablebox' }, el('table', {},
+      el('thead', {}, el('tr', {}, ['회원', '이메일', '가입', '마지막 접속', '아이', '구독', ''].map(h => el('th', {}, h)))), el('tbody', {}, rows)))
+    : el('div', { class:'panel empty' }, empty);
+  const head = crumb('현황', () => { tab = 'stats'; render(); }, '회원', data.length + '명' + (data.length >= 300 ? '+' : ''));
+  return [el('div', { style:'display:flex;flex-direction:column;gap:12px' }, body,
+    el('p', { class:'note' }, '관리자 계정은 빠져요. 마지막 접속은 앱이 열려 있던 마지막 시각이에요.')), el('div', { class:'r' }, seg, search), head];
+}
+
+async function memberDetail(id) {
+  const { data:d, error } = await sb.rpc('admin_member', { p_user: id });
+  if (error) throw error;
+  const back = () => { openMember = null; render(); };
+  if (!d) return [el('div', { class:'panel empty' }, '이 회원을 찾을 수 없어요. 탈퇴했을 수 있어요.'), null, crumb('회원', back, '회원 상세')];
+  const kv = (k, v) => el('div', { class:'kv' }, el('span', { class:'sub' }, k), el('span', {}, v));
+  const full = t => new Date(t).toLocaleString('ko-KR', { ...KST, year:'numeric', month:'numeric', day:'numeric', hour:'numeric', minute:'2-digit' });
+  const sub = d.sub, [pl] = PLAN[d.plan] || PLAN.free;
+  const plan = d.plan === 'free' ? (sub ? `무료 · 지난 구독 ${sub.status === 'expired' ? '만료' : sub.status} (${new Date(sub.expires_at).toLocaleDateString('ko-KR', KST)})${sub.env === 'Sandbox' ? ' · 테스트' : ''}` : '무료')
+    : `${pl} · ${/yearly/.test(sub && sub.product) ? '연간' : '월간'}${sub && sub.expires_at ? ` · ${new Date(sub.expires_at).toLocaleDateString('ko-KR', KST)}까지` : ''}${sub && !sub.auto_renew ? ' · 갱신 끔' : ''}`;
+  const push = !d.push.devices ? '없음' : (d.push.visit ? '허용' : '방명록·꽃 알림 끔') + (d.push.devices > 1 ? ` · 폰 ${d.push.devices}대` : '');
+  const account = el('div', { class:'panel box' }, el('h2', {}, '계정'),
+    kv('이메일', d.email || '—'), kv('로그인', PROVIDER[d.provider] || d.provider), kv('가입', full(d.created_at)),
+    kv('마지막 접속', d.last_seen ? full(d.last_seen) : '—'), kv('푸시', push), kv('구독', plan));
+  const ym = t => t ? t.slice(0, 7).replace('-', '. ') : null;
+  const pets = d.pets.length ? d.pets.map(p => {
+    const span = [ym(p.birth || p.together), ym(p.star)];
+    return el('div', { class:'pet' }, el('span', { class:'av big', style:`background:${tint(p.name)}` }),
+      el('div', { class:'col' }, el('span', {}, p.name, el('small', { class:'sub' }, ' · ' + (p.status === 'rainbow' ? '무지개 너머' : '함께 지내요') + (p.role === 'owner' ? '' : ' · 가족으로 함께'))),
+        el('span', { class:'sub', style:'font-size:12px' }, [p.breed || p.kind, span[0] || span[1] ? `${span[0] || ''} ~ ${span[1] || ''}`.trim() : null].filter(Boolean).join(' · '))),
+      el('span', { class:'sub', style:'margin-left:auto;font-size:13px;white-space:nowrap' }, [p.memorial ? '비석 1' : null, p.letters ? `편지 ${p.letters}` : null].filter(Boolean).join(' · ')));
+  }) : [el('p', { class:'empty' }, '등록한 아이가 없어요.')];
+  const [sn, su] = size(d.storage_bytes);
+  const right = el('div', { class:'panel box' }, el('h2', {}, '아이'), ...pets,
+    el('h2', { style:'margin-top:22px' }, '활동'), kv('일기', d.diary), kv('게시판 글 · 댓글', `${d.posts} · ${d.comments}`), kv('방명록', d.guestbook),
+    kv('사진·영상 용량', `${sn} ${su}`), kv('받은 신고', d.reported));
+  return [el('div', { style:'display:flex;flex-direction:column;gap:12px' }, el('div', { class:'two' }, account, right),
+    el('p', { class:'note' }, '읽기만 하는 화면이에요. 일기는 가족과 함께 쓰는 아이의 일기 전체 개수예요.')), null, crumb('회원', back, d.name || (d.provider === 'guest' ? '손님' : '(닉네임 없음)'))];
 }
 
 async function errors() {
