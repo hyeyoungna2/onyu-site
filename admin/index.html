@@ -22,6 +22,8 @@ aside { width:232px; flex:none; padding:28px 16px 20px; display:flex; flex-direc
 .nav:hover { background:#F1EEF7; }
 .nav.on { background:var(--violet); color:#fff; font-weight:500; }
 .nav .count { margin-left:auto; font-size:12px; min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:#FBE9E1; color:#C96C3B; display:inline-flex; align-items:center; justify-content:center; }
+.nav .ext { margin-left:auto; font-size:12px; color:var(--mute); }
+a.nav { text-decoration:none; }
 .nav.on .count { background:rgba(255,255,255,.2); color:#fff; }
 .me { padding:14px; border-radius:14px; background:#fff; border:1px solid var(--line); display:flex; flex-direction:column; gap:8px; }
 .me span { font-size:12px; color:var(--soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -225,6 +227,8 @@ function shell(title, body, extra) {
   const aside = el('aside', {},
     el('div', { class:'brand' }, el('img', { src:'logo.png', alt:'ONYU' }), el('span', {}, '관리자')),
     nav('stats', '현황'), nav('reports', '신고', counts.open_reports), nav('errors', '앱 오류', counts.errors_24h),
+    el('a', { class:'nav', href:'https://mail.google.com/mail/u/?authuser=onyu.help@gmail.com', target:'_blank', rel:'noopener' },
+      svg('<path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/>'), '문의 메일함', el('span', { class:'ext' }, '↗')),
     el('div', { class:'grow', style:'flex:1' }),
     el('div', { class:'me' }, el('span', {}, who), el('button', { onclick: async () => { await sb.auth.signOut(); login(); } }, '로그아웃')));
   const refresh = el('button', { class:'btn', onclick: render }, svg('<path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/>', 14, 1.8), '새로고침');
