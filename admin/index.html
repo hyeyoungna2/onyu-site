@@ -88,7 +88,38 @@ tr:last-child td { border-bottom:0; }
 .login p { margin:0 0 6px; color:var(--soft); font-size:14px; }
 .login input { height:44px; padding:0 14px; border:1px solid var(--line); border-radius:12px; font-size:14px; color:var(--ink); }
 .login .btn { height:44px; justify-content:center; font-size:14px; }
+.click { cursor:pointer; } .click:hover td { background:#FBFAFD; }
+.ell { max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+thead tr { border:0; }
+.linkbtn { background:none; border:0; padding:0; font-size:13px; color:var(--violet); font-weight:500; cursor:pointer; }
+.linkbtn.soft { color:var(--soft); font-weight:400; }
+.pad { padding:22px 24px; display:flex; flex-direction:column; }
+.pad .top { display:flex; align-items:center; gap:10px; }
+.detail { display:grid; grid-template-columns:1fr 380px; gap:22px; align-items:start; }
+.detail .col { display:flex; flex-direction:column; gap:16px; min-width:0; }
+.quote { padding:18px; border-radius:14px; background:#F7F5FB; display:flex; flex-direction:column; gap:10px; }
+.quote p { margin:0; font-size:14px; line-height:1.7; white-space:pre-wrap; word-break:break-word; }
+.who { display:flex; align-items:center; gap:10px; }
+.who .dot { width:32px; height:32px; border-radius:50%; background:#E6DFF3; flex:none; }
+.who b { display:block; font-size:13px; font-weight:500; }
+.who .sub { font-size:11px; }
+.photos { display:flex; gap:6px; flex-wrap:wrap; }
+.photos img { width:72px; height:72px; border-radius:10px; object-fit:cover; display:block; background:#DCD2F3; }
+.hist { display:flex; flex-direction:column; }
+.h { font-size:13px; font-weight:500; color:var(--nav); margin-bottom:4px; }
+.hrow { display:flex; justify-content:space-between; gap:10px; font-size:13px; padding:8px 0; border-bottom:1px solid #F1EEF6; }
+.hrow:last-child { border-bottom:0; }
+.hrow b { font-weight:500; }
+.facts { display:flex; gap:10px 28px; flex-wrap:wrap; font-size:13px; color:var(--soft); }
+.side .big { font-size:15px; font-weight:500; }
+.opt { display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:12px; border:1px solid var(--line); font-size:14px; cursor:pointer; }
+.opt .radio { width:16px; height:16px; border-radius:50%; border:1.5px solid var(--bar); flex:none; }
+.opt.on { border:1.5px solid var(--violet); background:#F7F5FB; }
+.opt.on .radio { border:5px solid var(--violet); }
+.side textarea { height:84px; border-radius:12px; border:1px solid var(--line); padding:12px 14px; font-size:13px; resize:none; outline:none; color:var(--ink); }
+.btn.big { height:46px; justify-content:center; font-size:14px; font-weight:500; border-radius:12px; }
 @media (max-width:860px) {
+  .detail { grid-template-columns:1fr; }
   .wrap { flex-direction:column; }
   aside { width:auto; flex-direction:row; flex-wrap:wrap; align-items:center; padding:14px 16px; gap:6px; border-right:0; border-bottom:1px solid var(--line); }
   .brand { padding:0 8px 0 0; } .brand img { width:64px; }
@@ -110,14 +141,15 @@ tr:last-child td { border-bottom:0; }
 const sb = supabase.createClient('https://gwkzhdafsgimmrwwfkop.supabase.co', 'sb_publishable_w8ZHKCAmFYeeVDt8-yrt1Q_smuB2X8e');
 const STORAGE = { bytes: 1073741824, label: 'Supabase 무료 1 GB' };   // Pro로 바꾸면 { bytes: 100 GB, label: 'Supabase Pro 100 GB' }
 const KIND = { memorial:'비석', guestbook:'방명록', reply:'방명록 답글', user:'광장의 사람', post:'게시판 글', comment:'게시판 댓글' };
-const STATUS = { open:['처리 전','b-wait'], hidden:['가림','b-done'], dismissed:['문제없음','b-skip'] };
+const STATUS = { open:['처리 전','b-wait'], hidden:['숨김','b-done'], dismissed:['문제없음','b-skip'] };
+const TYPE = { memorial:'비석', guestbook:'방명록', reply:'방명록 답글', user:'사용자', post:'게시글', comment:'댓글' };
 const ICON = {
   stats:'<path d="M4 13h6V4H4zM14 20h6V11h-6zM14 4v4h6V4zM4 16v4h6v-4z"/>',
   reports:'<path d="M5 21V4h11l-1.5 4L16 12H5"/>',
   errors:'<path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18.6A2 2 0 0 0 3.5 21.6h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
 };
 const $app = document.getElementById('app');
-let tab = 'stats', who = '', counts = { open_reports: 0, errors_24h: 0 }, repFilter = 'open';
+let tab = 'stats', who = '', counts = { open_reports: 0, errors_24h: 0 }, repFilter = 'open', openReport = null;
 
 function el(tag, attrs, ...kids) {
   const e = document.createElement(tag);
@@ -170,7 +202,7 @@ async function start() {
 }
 
 function shell(title, body, extra) {
-  const nav = (k, name, n) => el('button', { class:'nav' + (tab === k ? ' on' : ''), onclick: () => { tab = k; render(); } },
+  const nav = (k, name, n) => el('button', { class:'nav' + (tab === k ? ' on' : ''), onclick: () => { tab = k; openReport = null; render(); } },
     svg(ICON[k]), name, n ? el('span', { class:'count' }, n) : null);
   const aside = el('aside', {},
     el('div', { class:'brand' }, el('img', { src:'logo.png', alt:'ONYU' }), el('span', {}, '관리자')),
@@ -183,13 +215,13 @@ function shell(title, body, extra) {
 }
 
 async function render() {
-  const titles = { stats:'현황', reports:'신고', errors:'앱 오류' };
-  shell(titles[tab], el('p', { class:'note' }, '불러오는 중…'));
+  const title = tab === 'stats' ? '현황' : tab === 'errors' ? '앱 오류' : openReport ? '신고 처리' : '신고';
+  shell(title, el('p', { class:'note' }, '불러오는 중…'));
   try {
-    const [body, extra] = await (tab === 'stats' ? stats() : tab === 'reports' ? reports() : errors());
-    shell(titles[tab], body, extra);
+    const [body, extra] = await (tab === 'stats' ? stats() : tab === 'errors' ? errors() : openReport ? reportDetail(openReport) : reports());
+    shell(title, body, extra);
   } catch (e) {
-    shell(titles[tab], el('div', { class:'panel empty' }, '불러오지 못했어요: ' + (e.message || e)));
+    shell(title, el('div', { class:'panel empty' }, '불러오지 못했어요: ' + (e.message || e)));
   }
 }
 
@@ -240,34 +272,92 @@ async function stats() {
     el('span', { class:'stamp' }, '기준 ' + stamp(s.now))];
 }
 
+const RULE = '게시글·댓글·방명록은 신고 1건이면 바로 숨겨지고, 비석은 서로 다른 3명이 신고하면 숨겨져요. 확인 후 "숨기기"로 확정하거나, 오해였다면 "다시 보이기"를 눌러요.';
+const hm = t => new Date(t).toLocaleString('ko-KR', { ...KST, month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:false });
+
 async function reports() {
-  const { data, error } = await sb.rpc('admin_reports'); if (error) throw error;
-  const open = data.filter(r => r.status === 'open'), done = data.filter(r => r.status !== 'open');
-  counts.open_reports = open.length;
-  const act = async (r, a, btn) => {
-    btn.disabled = true;
-    const { error } = await sb.rpc('admin_act', { p_report: r.id, p_action: a });
-    if (error) { alert('처리하지 못했어요: ' + error.message); btn.disabled = false; return; }
-    render();
-  };
-  const card = r => {
-    const [label, cls] = STATUS[r.status] || [r.status, 'b-skip'];
-    return el('div', { class:'panel rep' },
-      el('div', { class:'top' }, el('b', {}, '#' + r.id + ' · ' + (KIND[r.target_type] || r.target_type)), el('span', { class:'badge ' + cls }, label),
-        el('span', { class:'sub' }, stamp(r.created_at) + (r.reporters ? ' · 신고 ' + r.reporters + '명' : '') + (r.handled_at ? ' · 처리 ' + stamp(r.handled_at) : ''))),
-      r.content ? el('div', { class:'content' }, r.content) : null,
-      r.reason ? el('p', { class:'note' }, '사유: ' + r.reason) : null,
-      r.status === 'open' ? el('div', { class:'btns' },
-        r.target_type !== 'user' ? el('button', { class:'btn red', onclick: e => act(r, 'hide', e.currentTarget) }, '가리기') : null,
-        r.target_type !== 'user' ? el('button', { class:'btn', onclick: e => act(r, 'restore', e.currentTarget) }, '다시 보이기') : null,
-        el('button', { class:'btn', onclick: e => act(r, 'dismiss', e.currentTarget) }, '문제없음')) : null);
-  };
-  const seg = el('div', { class:'seg' }, [['open', `처리 전 ${open.length}`], ['done', `최근 30일 처리 ${done.length}`]].map(([k, n]) =>
+  const [list, open] = await Promise.all([sb.rpc('admin_report_list', { p_filter: repFilter }),
+    repFilter === 'open' ? null : sb.rpc('admin_report_list', { p_filter: 'open' })]);
+  if (list.error) throw list.error;
+  const openN = repFilter === 'open' ? list.data.length : (open && !open.error ? open.data.length : counts.open_reports);
+  counts.open_reports = openN;
+  const seg = el('div', { class:'seg' }, [['open', '처리 전' + (openN ? ' ' + openN : '')], ['done', '처리됨'], ['all', '전체']].map(([k, n]) =>
     el('button', { class: repFilter === k ? 'on' : '', onclick: () => { repFilter = k; render(); } }, n)));
-  const list = repFilter === 'open' ? open : done;
-  return [el('div', { style:'display:flex;flex-direction:column;gap:16px' }, seg,
-    list.length ? el('div', { class:'list' }, list.map(card)) : el('div', { class:'panel empty' }, repFilter === 'open' ? '처리할 신고가 없어요.' : '최근 30일 동안 처리한 신고가 없어요.'),
-    el('p', { class:'note' }, '게시판 글·댓글·방명록은 신고 1건이면 이미 가려져 있어요(비석은 3명). 오해였다면 "다시 보이기", 그대로 둘 거면 "가리기"를 눌러 마무리해요.')), null];
+  const go = id => { openReport = id; render(); };
+  const rows = list.data.map(r => {
+    const [label, cls] = STATUS[r.status] || [r.status, 'b-skip'];
+    return el('tr', { class:'click', onclick: () => go(r.id) },
+      el('td', { class:'sub', style:'white-space:nowrap' }, hm(r.created_at)),
+      el('td', {}, el('span', { class:'badge b-plum' }, TYPE[r.target_type] || r.target_type)),
+      el('td', { class:'ell' }, r.target),
+      el('td', {}, r.reasons || el('span', { class:'sub' }, '사유 없음')),
+      el('td', { class:'sub' }, r.reporter + (r.reporters > 1 ? ` 외 ${r.reporters - 1}명` : '')),
+      el('td', {}, el('span', { class:'badge ' + cls }, label)),
+      el('td', { style:'text-align:right' }, el('button', { class:'linkbtn', onclick: e => { e.stopPropagation(); go(r.id); } }, '보기')));
+  });
+  const empty = { open:'처리할 신고가 없어요.', done:'최근 90일 동안 처리한 신고가 없어요.', all:'최근 90일 동안 신고가 없어요.' }[repFilter];
+  const body = el('div', { style:'display:flex;flex-direction:column;gap:14px' },
+    rows.length ? el('div', { class:'panel tablebox' }, el('table', {},
+      el('thead', {}, el('tr', {}, ['신고 시각', '유형', '대상', '사유', '신고자', '상태', ''].map(h => el('th', {}, h)))), el('tbody', {}, rows)))
+      : el('div', { class:'panel empty' }, empty),
+    el('p', { class:'note' }, RULE));
+  return [body, el('div', { class:'r' }, seg)];
+}
+
+async function reportDetail(id) {
+  const { data:d, error } = await sb.rpc('admin_report_detail', { p_report: id });
+  if (error) throw error;
+  const back = el('button', { class:'linkbtn soft', onclick: () => { openReport = null; render(); } }, '← 목록');
+  if (!d) return [el('div', { class:'panel empty' }, '이 신고를 찾을 수 없어요.'), back];
+  const t = d.target || {}, isOpen = d.status === 'open', [label, cls] = STATUS[d.status] || [d.status, 'b-skip'];
+  const reps = d.reports || [], a = d.author;
+
+  const photos = el('div', { class:'photos' });
+  if (t.photos && t.photos.length) {
+    sb.storage.from('media').createSignedUrls(t.photos, 600).then(({ data }) => {
+      (data || []).forEach(x => x.signedUrl && photos.append(el('a', { href: x.signedUrl, target:'_blank', rel:'noopener' }, el('img', { src: x.signedUrl, alt:'' }))));
+    });
+  }
+  const content = el('div', { class:'panel pad', style:'gap:14px' },
+    el('div', { class:'top' }, el('span', { class:'badge b-plum' }, TYPE[d.target_type] || d.target_type), el('span', { class:'badge ' + cls }, label),
+      t.hidden ? el('span', { class:'badge b-skip' }, '지금 숨겨져 있음') : null,
+      el('span', { class:'sub', style:'margin-left:auto' }, `신고 ${reps.length}건`)),
+    el('div', { class:'quote' },
+      el('div', { class:'who' }, el('span', { class:'dot' }), el('div', {}, el('b', {}, a ? a.name : '(알 수 없음)'),
+        el('span', { class:'sub' }, [t.at ? stamp(t.at) : null, t.place].filter(Boolean).join(' · ')))),
+      t.text ? el('p', {}, t.text) : el('p', { class:'sub' }, '(글 없음)'),
+      t.photos && t.photos.length ? photos : null),
+    el('div', { class:'hist' }, el('span', { class:'h' }, '신고 내역'),
+      reps.map(r => el('div', { class:'hrow' }, el('span', {}, el('b', {}, r.reason || '사유 없음'), ' · ' + r.who), el('span', { class:'sub' }, hm(r.at))))));
+  const author = a ? el('div', { class:'panel pad', style:'gap:8px' }, el('span', { class:'h' }, '작성자 ' + a.name),
+    el('div', { class:'facts' }, el('span', {}, '가입 ' + new Date(a.joined).toLocaleDateString('ko-KR', KST)),
+      el('span', {}, `게시글 ${a.posts}`), el('span', {}, `댓글 ${a.comments}`), el('span', {}, `방명록 ${a.guestbook}`),
+      el('span', {}, `받은 신고 ${a.reported}`), el('span', {}, a.hidden_before ? `이전에 숨겨진 것 ${a.hidden_before}` : '이전 제재 없음'))) : null;
+
+  // 처리: 사용자 신고는 '문제 없음'만, 내용은 숨기기 / 다시 보이기 (안 숨겨진 비석은 문제 없음도)
+  const opts = d.target_type === 'user' ? [['dismiss', '문제 없음', '광장의 사람은 기록만 남겨요']]
+    : [['hide', '숨기기', '다른 사람에게 보이지 않아요'], ['restore', '다시 보이기', '오해였어요 · 원래대로 보여요'],
+       ...(t.hidden ? [] : [['dismiss', '문제 없음', '그대로 두고 신고만 닫아요']])];
+  let pick = opts[0][0];
+  const radios = opts.map(([k, n, sub]) => {
+    const lab = el('label', { class:'opt' + (k === pick ? ' on' : ''), onclick: () => { pick = k; radios.forEach(x => x.classList.toggle('on', x.dataset.k === k)); } },
+      el('span', { class:'radio' }), n, el('span', { class:'sub', style:'margin-left:auto' }, sub));
+    lab.dataset.k = k; return lab;
+  });
+  const memo = el('textarea', { placeholder:'처리 메모 (관리자만 봐요)', maxlength:'300' });
+  const done = el('button', { class:'btn main big', onclick: async () => {
+    done.disabled = true;
+    const { error } = await sb.rpc('admin_act', { p_report: d.id, p_action: pick, p_note: memo.value.trim() || null });
+    if (error) { alert('처리하지 못했어요: ' + error.message); done.disabled = false; return; }
+    openReport = null; render();
+  } }, '처리 완료');
+  const side = isOpen
+    ? el('div', { class:'panel pad side', style:'gap:12px' }, el('span', { class:'big' }, '처리'), ...radios, memo, done,
+        el('p', { class:'note' }, '작성자에게 따로 알림은 가지 않아요.'))
+    : el('div', { class:'panel pad side', style:'gap:10px' }, el('span', { class:'big' }, '처리 결과'),
+        el('div', {}, el('span', { class:'badge ' + cls }, label), d.handled_at ? el('span', { class:'sub', style:'margin-left:8px' }, stamp(d.handled_at)) : null),
+        d.note ? el('div', { class:'quote' }, el('p', {}, d.note)) : el('p', { class:'note' }, '메모 없음'));
+  return [el('div', { class:'detail' }, el('div', { class:'col' }, content, author), side), back];
 }
 
 async function errors() {
