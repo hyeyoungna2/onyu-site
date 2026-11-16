@@ -5,75 +5,156 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>온유 관리자</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600&display=swap">
 <style>
-:root { --ink:#3F3A55; --soft:#7A7490; --violet:#5E5680; --line:#E6E1EF; --bg:#F6F4FA; --card:#fff; --red:#C96C6C; --green:#5E9E6E; }
+:root { --ink:#3F3A55; --soft:#7A7490; --mute:#A39EB3; --violet:#5E5680; --nav:#5F597A; --line:#ECE8F3; --row:#EFECF4; --bg:#F4F2F8; --side:#FBFAFD; --bar:#CFC8E6; }
 * { box-sizing:border-box; }
-body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif; background:var(--bg); color:var(--ink); }
-header { background:var(--card); border-bottom:1px solid var(--line); padding:14px 20px; display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:2; }
-header h1 { font-size:16px; margin:0; flex:1; }
-header .who { font-size:12px; color:var(--soft); }
-main { max-width:960px; margin:0 auto; padding:20px 16px 60px; }
-button { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:10px; padding:8px 14px; cursor:pointer; }
-button.main { background:var(--violet); color:#fff; border-color:var(--violet); }
-button.red { color:var(--red); }
-button:disabled { opacity:.5; cursor:default; }
-.tabs { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
-.tabs button.on { background:var(--violet); color:#fff; border-color:var(--violet); }
-.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
-.stat { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
-.stat b { display:block; font-size:24px; margin-top:4px; }
-.stat span { font-size:12px; color:var(--soft); }
-.card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:10px; }
-.card .top { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
-.card .top b { font-size:14px; }
-.meta { font-size:12px; color:var(--soft); }
-.content { margin:10px 0; padding:10px 12px; background:var(--bg); border-radius:10px; white-space:pre-wrap; word-break:break-word; font-size:14px; }
-.row { display:flex; gap:6px; flex-wrap:wrap; }
-.pill { font-size:11px; padding:2px 8px; border-radius:20px; background:var(--bg); color:var(--soft); }
-.pill.open { background:#FBE9E9; color:var(--red); }
-.pill.done { background:#E7F3EA; color:var(--green); }
-table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; font-size:13px; }
-th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; word-break:break-word; }
-th { font-size:12px; color:var(--soft); font-weight:500; background:var(--bg); }
-.center { text-align:center; padding:60px 20px; }
-.center p { color:var(--soft); }
-.empty { color:var(--soft); text-align:center; padding:30px; }
-h2 { font-size:14px; margin:22px 0 10px; color:var(--soft); font-weight:500; }
-.note { font-size:12px; color:var(--soft); margin-top:14px; }
+body { margin:0; font-family:'Noto Sans KR','Pretendard','Apple SD Gothic Neo',sans-serif; color:var(--ink); background:var(--bg); -webkit-font-smoothing:antialiased; }
+a { color:inherit; text-decoration:none; }
+button, input, select, textarea { font-family:inherit; }
+input::placeholder { color:#B3AEC4; }
+.wrap { min-height:100vh; display:flex; }
+aside { width:232px; flex:none; padding:28px 16px 20px; display:flex; flex-direction:column; gap:6px; border-right:1px solid var(--line); background:var(--side); }
+.brand { display:flex; align-items:center; gap:10px; padding:0 14px 26px; }
+.brand img { width:84px; height:auto; display:block; }
+.brand span { font-size:12px; color:var(--mute); margin-top:3px; }
+.nav { display:flex; align-items:center; gap:10px; height:42px; padding:0 14px; border-radius:12px; font-size:14px; color:var(--nav); cursor:pointer; border:0; background:none; text-align:left; width:100%; }
+.nav:hover { background:#F1EEF7; }
+.nav.on { background:var(--violet); color:#fff; font-weight:500; }
+.nav .count { margin-left:auto; font-size:12px; min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:#FBE9E1; color:#C96C3B; display:inline-flex; align-items:center; justify-content:center; }
+.nav.on .count { background:rgba(255,255,255,.2); color:#fff; }
+.me { padding:14px; border-radius:14px; background:#fff; border:1px solid var(--line); display:flex; flex-direction:column; gap:8px; }
+.me span { font-size:12px; color:var(--soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.me button { font-size:13px; color:var(--violet); font-weight:500; background:none; border:0; padding:0; text-align:left; cursor:pointer; }
+main { flex:1; min-width:0; padding:32px 56px 40px 48px; display:flex; flex-direction:column; gap:22px; }
+.head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.head h1 { margin:0; font-size:22px; font-weight:500; }
+.head .r { display:flex; align-items:center; gap:14px; }
+.stamp { font-size:13px; color:var(--mute); }
+.btn { height:36px; padding:0 14px; display:inline-flex; align-items:center; gap:6px; border-radius:10px; background:#fff; border:1px solid var(--line); font-size:13px; color:var(--nav); cursor:pointer; }
+.btn:disabled { opacity:.5; cursor:default; }
+.btn.main { background:var(--violet); border-color:var(--violet); color:#fff; }
+.btn.red { color:#C96C3B; }
+.panel { background:#fff; border:1px solid var(--line); border-radius:20px; }
+.stats { padding:28px 36px 8px; display:grid; grid-template-columns:1fr 1fr; column-gap:72px; row-gap:28px; }
+.stats h2, .box h2 { margin:0 0 6px; font-size:13px; font-weight:600; color:var(--violet); letter-spacing:.02em; }
+.row { display:flex; align-items:center; justify-content:space-between; height:48px; border-bottom:1px solid var(--row); }
+.row .k { font-size:15px; }
+.row .k small, .sub { font-size:13px; color:var(--mute); }
+.row .v { font-size:20px; font-weight:600; letter-spacing:-.01em; }
+.row .v.link { color:var(--violet); cursor:pointer; }
+.row .v.link:hover { text-decoration:underline; }
+.store { display:flex; flex-direction:column; gap:10px; padding:14px 0 4px; border-bottom:1px solid var(--row); }
+.store .top { display:flex; justify-content:space-between; align-items:center; }
+.store .v small { font-size:14px; font-weight:500; color:var(--soft); }
+.meter { height:6px; border-radius:3px; background:var(--row); overflow:hidden; }
+.meter div { height:100%; min-width:6px; background:var(--violet); }
+.meter.warn div { background:#C96C3B; }
+.store .pct { font-size:12px; color:var(--mute); padding-bottom:6px; }
+.two { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+.box { padding:22px 28px; display:flex; flex-direction:column; }
+.box .top { display:flex; justify-content:space-between; align-items:center; }
+.box .top .sum { font-size:13px; color:var(--soft); }
+.box .top .sum b { font-weight:600; color:var(--ink); }
+.chart { display:flex; align-items:flex-end; gap:10px; height:110px; padding-top:10px; }
+.chart .c { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; justify-content:flex-end; height:100%; }
+.chart .c span { font-size:12px; color:var(--soft); }
+.chart .c i { width:100%; border-radius:4px; background:var(--bar); display:block; }
+.chart .c.today i { background:var(--violet); }
+.chart .c em { font-style:normal; font-size:12px; color:var(--mute); }
+.act { display:flex; justify-content:space-between; align-items:center; gap:12px; min-height:42px; border-bottom:1px solid var(--row); font-size:14px; }
+.act:last-child { border-bottom:0; }
+.act time { color:var(--mute); font-size:13px; white-space:nowrap; }
+.empty { color:var(--mute); text-align:center; padding:26px 10px; font-size:14px; }
+.note { font-size:12px; color:var(--mute); margin:0; }
+.badge { display:inline-flex; align-items:center; height:24px; padding:0 10px; border-radius:12px; font-size:12px; font-weight:500; }
+.b-wait { background:#FBE9E1; color:#C96C3B; } .b-done { background:#E6F2EA; color:#3F8F5A; } .b-skip { background:#EEEBF4; color:var(--soft); } .b-plum { background:#EEEBF4; color:var(--violet); }
+.seg { align-self:flex-start; display:inline-flex; background:var(--line); border-radius:12px; padding:3px; }
+.seg button { height:32px; padding:0 14px; border:0; background:none; border-radius:9px; font-size:13px; color:var(--soft); cursor:pointer; }
+.seg button.on { background:#fff; color:var(--ink); font-weight:500; box-shadow:0 1px 2px rgba(63,58,85,.08); }
+.rep { padding:20px 24px; display:flex; flex-direction:column; gap:10px; }
+.rep .top { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.rep .top b { font-size:14px; font-weight:600; }
+.rep .content { padding:12px 14px; background:var(--bg); border-radius:12px; white-space:pre-wrap; word-break:break-word; font-size:14px; }
+.rep .btns { display:flex; gap:8px; flex-wrap:wrap; }
+.list { display:flex; flex-direction:column; gap:12px; }
+table { border-collapse:collapse; width:100%; }
+th { text-align:left; font-size:12px; font-weight:500; color:var(--mute); padding:0 16px 12px; border-bottom:1px solid var(--line); }
+td { font-size:14px; padding:14px 16px; border-bottom:1px solid #F1EEF6; vertical-align:top; word-break:break-word; }
+tr:last-child td { border-bottom:0; }
+.tablebox { padding:20px 12px 8px; overflow-x:auto; }
+.login { max-width:360px; margin:12vh auto 0; padding:36px 32px; display:flex; flex-direction:column; gap:12px; text-align:center; }
+.login img { width:110px; margin:0 auto 4px; }
+.login p { margin:0 0 6px; color:var(--soft); font-size:14px; }
+.login input { height:44px; padding:0 14px; border:1px solid var(--line); border-radius:12px; font-size:14px; color:var(--ink); }
+.login .btn { height:44px; justify-content:center; font-size:14px; }
+@media (max-width:860px) {
+  .wrap { flex-direction:column; }
+  aside { width:auto; flex-direction:row; flex-wrap:wrap; align-items:center; padding:14px 16px; gap:6px; border-right:0; border-bottom:1px solid var(--line); }
+  .brand { padding:0 8px 0 0; } .brand img { width:64px; }
+  aside .nav { width:auto; height:36px; padding:0 12px; }
+  aside .grow { display:none; }
+  .me { flex-direction:row; align-items:center; padding:8px 12px; margin-left:auto; }
+  main { padding:20px 16px 32px; }
+  .stats { grid-template-columns:1fr; padding:20px 20px 4px; row-gap:20px; }
+  .two { grid-template-columns:1fr; }
+  .box { padding:18px 20px; }
+}
 </style>
 </head>
 <body>
-<header><h1>온유 관리자</h1><span class="who" id="who"></span><button id="out" hidden>로그아웃</button></header>
-<main id="app"><div class="center"><p>불러오는 중…</p></div></main>
+<div id="app"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 // 서버 비밀키는 없다: 공개 키 + 로그인한 관리자 계정. 보이는 것과 처리는 모두 서버가 관리자인지 확인한 뒤에만 된다.
 const sb = supabase.createClient('https://gwkzhdafsgimmrwwfkop.supabase.co', 'sb_publishable_w8ZHKCAmFYeeVDt8-yrt1Q_smuB2X8e');
-const $app = document.getElementById('app');
+const STORAGE = { bytes: 1073741824, label: 'Supabase 무료 1 GB' };   // Pro로 바꾸면 { bytes: 100 GB, label: 'Supabase Pro 100 GB' }
 const KIND = { memorial:'비석', guestbook:'방명록', reply:'방명록 답글', user:'광장의 사람', post:'게시판 글', comment:'게시판 댓글' };
-const STATUS = { open:'처리 전', hidden:'가림', dismissed:'문제없음' };
-let tab = 'stats';
+const STATUS = { open:['처리 전','b-wait'], hidden:['가림','b-done'], dismissed:['문제없음','b-skip'] };
+const ICON = {
+  stats:'<path d="M4 13h6V4H4zM14 20h6V11h-6zM14 4v4h6V4zM4 16v4h6v-4z"/>',
+  reports:'<path d="M5 21V4h11l-1.5 4L16 12H5"/>',
+  errors:'<path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18.6A2 2 0 0 0 3.5 21.6h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+};
+const $app = document.getElementById('app');
+let tab = 'stats', who = '', counts = { open_reports: 0, errors_24h: 0 }, repFilter = 'open';
 
 function el(tag, attrs, ...kids) {
   const e = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs || {})) { if (k === 'onclick') e.onclick = v; else if (k === 'class') e.className = v; else if (v !== undefined && v !== null) e.setAttribute(k, v); }
-  for (const k of kids.flat()) if (k !== null && k !== undefined) e.append(k instanceof Node ? k : document.createTextNode(String(k)));
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k.startsWith('on')) e[k] = v; else if (k === 'class') e.className = v; else if (k === 'html') e.innerHTML = v;
+    else if (v !== undefined && v !== null && v !== false) e.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) e.append(k instanceof Node ? k : document.createTextNode(String(k)));
   return e;
 }
-const when = t => t ? new Date(t).toLocaleString('ko-KR', { timeZone:'Asia/Seoul', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
-const mb = b => b >= 1073741824 ? (b / 1073741824).toFixed(2) + ' GB' : (b / 1048576).toFixed(1) + ' MB';
+const svg = (p, s = 18, w = 1.6) => el('span', { html: `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`, style: 'display:flex' });
+const KST = { timeZone: 'Asia/Seoul' };
+const stamp = t => new Date(t).toLocaleString('ko-KR', { ...KST, month:'numeric', day:'numeric', hour:'numeric', minute:'2-digit' });
+const dayKey = t => new Date(t).toLocaleDateString('en-CA', KST);
+function ago(t) {   // 오늘이면 시각, 어제면 '어제', 그 전은 날짜
+  const d = dayKey(t), today = dayKey(Date.now()), yest = dayKey(Date.now() - 864e5);
+  if (d === today) return new Date(t).toLocaleTimeString('ko-KR', { ...KST, hour:'numeric', minute:'2-digit' });
+  if (d === yest) return '어제';
+  return new Date(t).toLocaleDateString('ko-KR', { ...KST, month:'numeric', day:'numeric' });
+}
+function size(b) {
+  if (b >= 1073741824) return [(b / 1073741824).toFixed(2), 'GB'];
+  if (b >= 1048576) return [(b / 1048576).toFixed(1), 'MB'];
+  return [(b / 1024).toFixed(0), 'KB'];
+}
 
 function login(msg) {
-  document.getElementById('out').hidden = true; document.getElementById('who').textContent = '';
-  const mail = el('input', { type:'email', value:'onyu.help@gmail.com', autocomplete:'username', style:'width:100%;max-width:300px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;margin:4px 0' });
-  const pw = el('input', { type:'password', placeholder:'비밀번호', autocomplete:'current-password', style:'width:100%;max-width:300px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;margin:4px 0' });
-  const go = el('button', { class:'main', type:'submit', style:'margin-top:8px' }, '로그인');
-  const form = el('form', { class:'center' }, el('p', {}, msg || '관리자 계정으로 로그인해 주세요.'), mail, el('br'), pw, el('br'), go);
-  form.onsubmit = async (e) => {
+  const mail = el('input', { type:'email', value:'onyu.help@gmail.com', autocomplete:'username' });
+  const pw = el('input', { type:'password', placeholder:'비밀번호', autocomplete:'current-password' });
+  const go = el('button', { class:'btn main', type:'submit' }, '로그인');
+  const note = el('p', {}, msg || '관리자 계정으로 로그인해 주세요.');
+  const form = el('form', { class:'panel login' }, el('img', { src:'logo.png', alt:'ONYU' }), note, mail, pw, go);
+  form.onsubmit = async e => {
     e.preventDefault(); go.disabled = true;
     const { error } = await sb.auth.signInWithPassword({ email: mail.value.trim(), password: pw.value });
     go.disabled = false;
-    if (error) { pw.value = ''; form.querySelector('p').textContent = error.message.includes('confirm') ? '메일 인증이 아직 안 됐어요.' : '메일이나 비밀번호가 맞지 않아요.'; return; }
+    if (error) { pw.value = ''; note.textContent = error.message.includes('confirm') ? '메일 인증이 아직 안 됐어요.' : '메일이나 비밀번호가 맞지 않아요.'; return; }
     start();
   };
   $app.replaceChildren(form);
@@ -82,38 +163,87 @@ function login(msg) {
 async function start() {
   const { data:{ session } } = await sb.auth.getSession();
   if (!session) return login();
-  document.getElementById('who').textContent = session.user.email || '';
-  const out = document.getElementById('out'); out.hidden = false; out.onclick = async () => { await sb.auth.signOut(); login(); };
+  who = session.user.email || '';
   const { data:ok, error } = await sb.rpc('is_admin');
   if (error || !ok) { await sb.auth.signOut(); return login('이 계정은 관리자가 아니에요. onyu.help@gmail.com 으로 로그인해 주세요.'); }
   render();
 }
 
+function shell(title, body, extra) {
+  const nav = (k, name, n) => el('button', { class:'nav' + (tab === k ? ' on' : ''), onclick: () => { tab = k; render(); } },
+    svg(ICON[k]), name, n ? el('span', { class:'count' }, n) : null);
+  const aside = el('aside', {},
+    el('div', { class:'brand' }, el('img', { src:'logo.png', alt:'ONYU' }), el('span', {}, '관리자')),
+    nav('stats', '현황'), nav('reports', '신고', counts.open_reports), nav('errors', '앱 오류', counts.errors_24h),
+    el('div', { class:'grow', style:'flex:1' }),
+    el('div', { class:'me' }, el('span', {}, who), el('button', { onclick: async () => { await sb.auth.signOut(); login(); } }, '로그아웃')));
+  const refresh = el('button', { class:'btn', onclick: render }, svg('<path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/>', 14, 1.8), '새로고침');
+  const head = el('div', { class:'head' }, el('h1', {}, title), el('div', { class:'r' }, extra || null, refresh));
+  $app.replaceChildren(el('div', { class:'wrap' }, aside, el('main', {}, head, body)));
+}
+
 async function render() {
-  const tabs = el('div', { class:'tabs' }, [['stats','현황'], ['reports','신고'], ['errors','앱 오류']].map(([k, n]) =>
-    el('button', { class: tab === k ? 'on' : '', onclick: () => { tab = k; render(); } }, n)), el('button', { onclick: render }, '새로고침'));
-  const body = el('div', {}, el('p', { class:'meta' }, '불러오는 중…'));
-  $app.replaceChildren(tabs, body);
-  try { body.replaceChildren(await (tab === 'stats' ? stats() : tab === 'reports' ? reports() : errors())); }
-  catch (e) { body.replaceChildren(el('p', { class:'empty' }, '불러오지 못했어요: ' + (e.message || e))); }
+  const titles = { stats:'현황', reports:'신고', errors:'앱 오류' };
+  shell(titles[tab], el('p', { class:'note' }, '불러오는 중…'));
+  try {
+    const [body, extra] = await (tab === 'stats' ? stats() : tab === 'reports' ? reports() : errors());
+    shell(titles[tab], body, extra);
+  } catch (e) {
+    shell(titles[tab], el('div', { class:'panel empty' }, '불러오지 못했어요: ' + (e.message || e)));
+  }
 }
 
 async function stats() {
-  const { data:s, error } = await sb.rpc('admin_stats'); if (error) throw error;
-  const box = (n, v) => el('div', { class:'stat' }, el('span', {}, n), el('b', {}, v));
-  return el('div', {},
-    el('div', { class:'grid' },
-      box('회원', s.members), box('오늘 가입', s.new_today), box('오늘 들어온 사람', s.active_today), box('둘러보기(손님)', s.guests),
-      box('온유 플러스', s.plus), box('플러스 (샌드박스)', s.plus_sandbox),
-      box('반려동물', s.pets), box('정원의 비석', s.memorials), box('게시판 글', s.posts),
-      box('사진·영상 용량', mb(s.storage_bytes)), box('영상', s.videos), box('푸시 받는 폰', s.push_devices),
-      box('처리 전 신고', s.open_reports), box('앱 오류 (24시간)', s.errors_24h)),
-    el('p', { class:'note' }, '기준 시각 ' + when(s.now) + ' · 관리자 계정은 회원 수에서 빠져요. Supabase 무료 요금제의 저장 공간은 프로젝트 전체 1GB예요.'));
+  const [{ data:s, error }, ov] = await Promise.all([sb.rpc('admin_stats'), sb.rpc('admin_overview')]);
+  if (error) throw error;
+  counts = { open_reports: s.open_reports, errors_24h: s.errors_24h };
+  const row = (k, v, sub, go) => el('div', { class:'row' },
+    el('span', { class:'k' }, k, sub ? el('small', {}, ' ' + sub) : null),
+    el('span', { class:'v' + (go ? ' link' : ''), onclick: go ? () => { tab = go; render(); } : null }, v));
+  const sec = (h, ...rows) => el('section', {}, el('h2', {}, h), ...rows);
+  const [n, unit] = size(s.storage_bytes);
+  const pct = s.storage_bytes / STORAGE.bytes * 100;
+  const store = el('div', { class:'store' },
+    el('div', { class:'top' }, el('span', { class:'k', style:'font-size:15px' }, '사진·영상 용량 ', el('small', { class:'sub' }, STORAGE.label)),
+      el('span', { class:'v', style:'font-size:20px;font-weight:600' }, n + ' ', el('small', {}, unit))),
+    el('div', { class:'meter' + (pct >= 80 ? ' warn' : '') }, el('div', { style:`width:${Math.min(pct, 100)}%` })),
+    el('span', { class:'pct' }, (pct < 0.1 && pct > 0 ? '0.1% 미만' : pct.toFixed(1) + '%') + ' 사용' + (pct >= 80 ? ' · 곧 가득 차요' : '')));
+  const grid = el('div', { class:'panel stats' },
+    sec('사용자', row('회원', s.members, '관리자 제외'), row('오늘 가입', s.new_today), row('오늘 방문', s.active_today), row('둘러보기(손님)', s.guests)),
+    sec('기록', row('반려동물', s.pets), row('정원의 비석', s.memorials), row('게시판 글', s.posts), row('영상', s.videos)),
+    sec('구독', row('온유 플러스', s.plus, '이용 중'), row('플러스 (샌드박스)', s.plus_sandbox, '테스트 결제'), row('푸시 받는 폰', s.push_devices)),
+    sec('처리할 일', row('처리 전 신고', s.open_reports, null, 'reports'), row('앱 오류', s.errors_24h, '24시간', 'errors'), store));
+
+  let chart, recent;
+  if (ov.error || !ov.data) {
+    const miss = el('p', { class:'empty' }, '서버에 admin_overview 함수가 아직 없어요 (SQL 실행 필요).');
+    chart = el('section', { class:'panel box' }, el('h2', {}, '최근 7일 가입'), miss);
+    recent = el('section', { class:'panel box' }, el('h2', {}, '최근 활동'), miss.cloneNode(true));
+  } else {
+    const days = ov.data.signups || [], max = Math.max(1, ...days.map(d => d.n)), total = days.reduce((a, d) => a + d.n, 0);
+    const today = dayKey(Date.now());
+    chart = el('section', { class:'panel box' },
+      el('div', { class:'top' }, el('h2', { style:'margin:0' }, '최근 7일 가입'), el('span', { class:'sum' }, '합계 ', el('b', {}, total))),
+      el('div', { class:'chart' }, days.map(d => el('div', { class:'c' + (d.day === today ? ' today' : '') },
+        el('span', {}, d.n), el('i', { style:`height:${Math.max(3, Math.round(d.n / max * 64))}px` }),
+        el('em', {}, new Date(d.day + 'T12:00:00+09:00').toLocaleDateString('ko-KR', { ...KST, weekday:'short' }))))));
+    const say = r => r.kind === 'signup' ? (r.name && r.name !== '방문객' ? `${r.name} 님이 가입했어요` : '새 회원이 가입했어요 (이름 비공개)')
+      : r.kind === 'memorial' ? `「${r.name}」 비석이 세워지거나 바뀌었어요`
+      : `게시판에 새 글 ${r.n}개`;
+    const items = ov.data.recent || [];
+    recent = el('section', { class:'panel box' }, el('h2', { style:'margin:0 0 4px' }, '최근 활동'),
+      items.length ? items.map(r => el('div', { class:'act' }, el('span', {}, say(r)), el('time', {}, ago(r.at))))
+                   : el('p', { class:'empty' }, '최근 7일 동안 활동이 없어요.'));
+  }
+  return [el('div', { style:'display:flex;flex-direction:column;gap:22px' }, grid, el('div', { class:'two' }, chart, recent),
+    el('p', { class:'note' }, '관리자 계정은 회원 수에서 빠져요. 최근 활동의 이름은 그 사람의 공개 설정을 따라요.')),
+    el('span', { class:'stamp' }, '기준 ' + stamp(s.now))];
 }
 
 async function reports() {
   const { data, error } = await sb.rpc('admin_reports'); if (error) throw error;
   const open = data.filter(r => r.status === 'open'), done = data.filter(r => r.status !== 'open');
+  counts.open_reports = open.length;
   const act = async (r, a, btn) => {
     btn.disabled = true;
     const { error } = await sb.rpc('admin_act', { p_report: r.id, p_action: a });
@@ -121,34 +251,36 @@ async function reports() {
     render();
   };
   const card = r => {
-    const btns = r.status === 'open' ? el('div', { class:'row' },
-      r.target_type !== 'user' ? el('button', { class:'red', onclick: e => act(r, 'hide', e.target) }, '가리기') : null,
-      r.target_type !== 'user' ? el('button', { onclick: e => act(r, 'restore', e.target) }, '다시 보이기') : null,
-      el('button', { onclick: e => act(r, 'dismiss', e.target) }, '문제없음')) : null;
-    return el('div', { class:'card' },
-      el('div', { class:'top' }, el('b', {}, '#' + r.id + ' · ' + (KIND[r.target_type] || r.target_type)),
-        el('span', { class:'pill ' + (r.status === 'open' ? 'open' : 'done') }, STATUS[r.status] || r.status),
-        el('span', { class:'meta' }, when(r.created_at) + (r.reporters ? ' · 신고 ' + r.reporters + '명' : '') + (r.handled_at ? ' · 처리 ' + when(r.handled_at) : ''))),
+    const [label, cls] = STATUS[r.status] || [r.status, 'b-skip'];
+    return el('div', { class:'panel rep' },
+      el('div', { class:'top' }, el('b', {}, '#' + r.id + ' · ' + (KIND[r.target_type] || r.target_type)), el('span', { class:'badge ' + cls }, label),
+        el('span', { class:'sub' }, stamp(r.created_at) + (r.reporters ? ' · 신고 ' + r.reporters + '명' : '') + (r.handled_at ? ' · 처리 ' + stamp(r.handled_at) : ''))),
       r.content ? el('div', { class:'content' }, r.content) : null,
-      r.reason ? el('p', { class:'meta' }, '사유: ' + r.reason) : null,
-      btns);
+      r.reason ? el('p', { class:'note' }, '사유: ' + r.reason) : null,
+      r.status === 'open' ? el('div', { class:'btns' },
+        r.target_type !== 'user' ? el('button', { class:'btn red', onclick: e => act(r, 'hide', e.currentTarget) }, '가리기') : null,
+        r.target_type !== 'user' ? el('button', { class:'btn', onclick: e => act(r, 'restore', e.currentTarget) }, '다시 보이기') : null,
+        el('button', { class:'btn', onclick: e => act(r, 'dismiss', e.currentTarget) }, '문제없음')) : null);
   };
-  return el('div', {},
-    el('h2', {}, '처리 전 ' + open.length + '건'),
-    open.length ? open.map(card) : el('p', { class:'empty' }, '처리할 신고가 없어요.'),
-    el('p', { class:'note' }, '게시판 글·댓글·방명록은 신고 1건이면 이미 가려져 있어요(비석은 3명). 오해였다면 "다시 보이기", 그대로 둘 거면 "가리기"를 눌러 마무리해요.'),
-    el('h2', {}, '최근 30일 처리'),
-    done.length ? done.map(card) : el('p', { class:'empty' }, '없어요.'));
+  const seg = el('div', { class:'seg' }, [['open', `처리 전 ${open.length}`], ['done', `최근 30일 처리 ${done.length}`]].map(([k, n]) =>
+    el('button', { class: repFilter === k ? 'on' : '', onclick: () => { repFilter = k; render(); } }, n)));
+  const list = repFilter === 'open' ? open : done;
+  return [el('div', { style:'display:flex;flex-direction:column;gap:16px' }, seg,
+    list.length ? el('div', { class:'list' }, list.map(card)) : el('div', { class:'panel empty' }, repFilter === 'open' ? '처리할 신고가 없어요.' : '최근 30일 동안 처리한 신고가 없어요.'),
+    el('p', { class:'note' }, '게시판 글·댓글·방명록은 신고 1건이면 이미 가려져 있어요(비석은 3명). 오해였다면 "다시 보이기", 그대로 둘 거면 "가리기"를 눌러 마무리해요.')), null];
 }
 
 async function errors() {
   const { data, error } = await sb.rpc('admin_errors', { p_days: 7 }); if (error) throw error;
-  if (!data.length) return el('div', {}, el('p', { class:'empty' }, '최근 7일 동안 앱 오류가 없어요.'),
-    el('p', { class:'note' }, '앱이 튕긴 것(크래시)은 여기 오지 않아요: Xcode → Window → Organizer → Crashes 에서 봐요.'));
-  return el('div', {},
-    el('table', {}, el('tr', {}, ['종류', '내용', '횟수', '사람', '마지막', '앱·OS'].map(h => el('th', {}, h))),
-      data.map(e => el('tr', {}, el('td', {}, e.kind), el('td', {}, e.message || ''), el('td', {}, e.count), el('td', {}, e.users), el('td', {}, when(e.last_at)), el('td', {}, [e.app_ver, e.os].filter(Boolean).join(' · '))))),
-    el('p', { class:'note' }, '최근 7일, 같은 오류끼리 묶었어요. 앱이 튕긴 것(크래시)은 Xcode Organizer 에서 봐요.'));
+  const crash = '앱이 튕긴 것(크래시)은 여기 오지 않아요: Xcode → Window → Organizer → Crashes 에서 봐요.';
+  if (!data.length) return [el('div', { style:'display:flex;flex-direction:column;gap:12px' },
+    el('div', { class:'panel empty' }, '최근 7일 동안 앱 오류가 없어요.'), el('p', { class:'note' }, crash)), null];
+  return [el('div', { style:'display:flex;flex-direction:column;gap:12px' },
+    el('div', { class:'panel tablebox' }, el('table', {},
+      el('tr', {}, ['종류', '내용', '횟수', '사람', '마지막', '앱·OS'].map(h => el('th', {}, h))),
+      data.map(e => el('tr', {}, el('td', {}, el('span', { class:'badge b-plum' }, e.kind)), el('td', {}, e.message || ''), el('td', {}, e.count),
+        el('td', {}, e.users), el('td', { style:'white-space:nowrap' }, stamp(e.last_at)), el('td', { class:'sub' }, [e.app_ver, e.os].filter(Boolean).join(' · ')))))),
+    el('p', { class:'note' }, '최근 7일, 같은 오류끼리 묶었어요. ' + crash)), null];
 }
 
 start();
