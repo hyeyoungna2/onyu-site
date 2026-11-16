@@ -129,7 +129,12 @@ thead tr { border:0; }
 .pet { display:flex; align-items:center; gap:12px; min-height:56px; border-bottom:1px solid var(--row); }
 .pet .col { display:flex; flex-direction:column; font-size:14px; }
 .pet small { font-size:12px; }
+.kpis { padding:22px 0; display:grid; grid-template-columns:repeat(5, 1fr); }
+.kpi { display:flex; flex-direction:column; gap:4px; padding:0 28px; border-right:1px solid var(--row); }
+.kpi.last { border-right:0; } .kpi .sub { font-size:13px; } .kpi small { color:#B3AEC4; font-size:13px; } .kpi b { font-size:22px; font-weight:600; }
+a.btn { text-decoration:none; }
 @media (max-width:860px) {
+  .kpis { grid-template-columns:1fr 1fr; row-gap:18px; } .kpi { border-right:0; padding:0 20px; }
   .tablebox th, .tablebox td { white-space:nowrap; } .ell { max-width:200px; }
   .search { width:100%; } .head .r { flex-wrap:wrap; }
   .detail { grid-template-columns:1fr; }
@@ -162,7 +167,7 @@ const ICON = {
   errors:'<path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18.6A2 2 0 0 0 3.5 21.6h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
 };
 const $app = document.getElementById('app');
-let tab = 'stats', who = '', counts = { open_reports: 0, errors_24h: 0 }, repFilter = 'open', openReport = null, memFilter = 'all', memQ = '', openMember = null;
+let tab = 'stats', who = '', counts = { open_reports: 0, errors_24h: 0 }, repFilter = 'open', openReport = null, memFilter = 'all', memQ = '', openMember = null, subsEnv = 'Production';
 
 function el(tag, attrs, ...kids) {
   const e = document.createElement(tag);
@@ -215,7 +220,7 @@ async function start() {
 }
 
 function shell(title, body, extra) {
-  const nav = (k, name, n) => el('button', { class:'nav' + (tab === k || (k === 'stats' && tab === 'members') ? ' on' : ''), onclick: () => { tab = k; openReport = null; openMember = null; render(); } },
+  const nav = (k, name, n) => el('button', { class:'nav' + (tab === k || (k === 'stats' && (tab === 'members' || tab === 'subs')) ? ' on' : ''), onclick: () => { tab = k; openReport = null; openMember = null; render(); } },
     svg(ICON[k]), name, n ? el('span', { class:'count' }, n) : null);
   const aside = el('aside', {},
     el('div', { class:'brand' }, el('img', { src:'logo.png', alt:'ONYU' }), el('span', {}, '관리자')),
@@ -228,10 +233,10 @@ function shell(title, body, extra) {
 }
 
 async function render() {
-  const title = tab === 'stats' ? '현황' : tab === 'errors' ? '앱 오류' : tab === 'members' ? '회원' : openReport ? '신고 처리' : '신고';
+  const title = tab === 'stats' ? '현황' : tab === 'errors' ? '앱 오류' : tab === 'members' ? '회원' : tab === 'subs' ? '구독' : openReport ? '신고 처리' : '신고';
   shell(title, el('p', { class:'note' }, '불러오는 중…'));
   try {
-    const [body, extra, head] = await (tab === 'stats' ? stats() : tab === 'errors' ? errors() : tab === 'members' ? (openMember ? memberDetail(openMember) : members())
+    const [body, extra, head] = await (tab === 'stats' ? stats() : tab === 'errors' ? errors() : tab === 'subs' ? subs() : tab === 'members' ? (openMember ? memberDetail(openMember) : members())
       : openReport ? reportDetail(openReport) : reports());
     shell(head || title, body, extra);
     if (tab === 'members' && !openMember && memFocus) { const i = document.querySelector('.search input'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
@@ -248,6 +253,7 @@ async function stats() {
     el('span', { class:'k' }, k, sub ? el('small', {}, ' ' + sub) : null),
     el('span', { class:'v' + (typeof go === 'string' ? ' link' : ''), onclick: typeof go === 'string' ? () => { tab = go; render(); } : null }, v));
   const mem = f => () => { tab = 'members'; memFilter = f; memQ = ''; openMember = null; render(); };
+  const subsGo = e => () => { tab = 'subs'; subsEnv = e; render(); };
   const sec = (h, ...rows) => el('section', {}, el('h2', {}, h), ...rows);
   const [n, unit] = size(s.storage_bytes);
   const pct = s.storage_bytes / STORAGE.bytes * 100;
@@ -259,7 +265,7 @@ async function stats() {
   const grid = el('div', { class:'panel stats' },
     sec('사용자', row('회원', s.members, '관리자 제외', mem('all')), row('오늘 가입', s.new_today, null, mem('today')), row('오늘 방문', s.active_today), row('둘러보기(손님)', s.guests, null, mem('guest'))),
     sec('기록', row('반려동물', s.pets), row('정원의 비석', s.memorials), row('게시판 글', s.posts), row('영상', s.videos)),
-    sec('구독', row('온유 플러스', s.plus, '이용 중', mem('plus')), row('플러스 (샌드박스)', s.plus_sandbox, '테스트 결제', mem('plus')), row('푸시 받는 폰', s.push_devices)),
+    sec('구독', row('온유 플러스', s.plus, '이용 중', subsGo('Production')), row('플러스 (샌드박스)', s.plus_sandbox, '테스트 결제', subsGo('Sandbox')), row('푸시 받는 폰', s.push_devices)),
     sec('처리할 일', row('처리 전 신고', s.open_reports, null, 'reports'), row('앱 오류', s.errors_24h, '24시간', 'errors'), store));
 
   let chart, recent;
@@ -441,6 +447,49 @@ async function memberDetail(id) {
     kv('사진·영상 용량', `${sn} ${su}`), kv('받은 신고', d.reported));
   return [el('div', { style:'display:flex;flex-direction:column;gap:12px' }, el('div', { class:'two' }, account, right),
     el('p', { class:'note' }, '읽기만 하는 화면이에요. 일기는 가족과 함께 쓰는 아이의 일기 전체 개수예요.')), null, crumb('회원', back, d.name || (d.provider === 'guest' ? '손님' : '(닉네임 없음)'))];
+}
+
+const PRICE = { monthly: 4900, yearly: 48900 };   // 한국 App Store 가격 (원)
+const won = n => Math.round(n).toLocaleString('ko-KR') + '원';
+const ymd = t => new Date(t).toLocaleDateString('ko-KR', KST);
+
+async function subs() {
+  const { data, error } = await sb.rpc('admin_subs', { p_env: subsEnv });
+  if (error) throw error;
+  const now = Date.now(), month = dayKey(now).slice(0, 7);
+  const live = r => ['active', 'grace'].includes(r.status) && (!r.expires_at || new Date(r.expires_at) > now);
+  const yearly = r => /yearly/.test(r.product);
+  const on = data.filter(live), m = on.filter(r => !yearly(r)).length, y = on.filter(yearly).length;
+  const mrr = m * PRICE.monthly + y * PRICE.yearly / 12;
+  const churn = data.filter(r => (!r.auto_renew || !live(r)) && dayKey(r.updated_at).slice(0, 7) === month).length;
+  const stat = (k, sub, v, last) => el('div', { class:'kpi' + (last ? ' last' : '') }, el('span', { class:'sub' }, k, sub ? el('small', {}, ' ' + sub) : null), el('b', {}, v));
+  const kpis = el('div', { class:'panel kpis' }, stat('이용 중', null, on.length), stat('월간', null, m), stat('연간', null, y),
+    stat('월 환산 매출', '수수료 전', won(mrr)), stat('이번 달 해지', null, churn, true));
+  const state = r => !live(r) ? ({ revoked:['취소됨','b-skip'], refunded:['환불','b-skip'] }[r.status] || ['만료','b-skip'])
+    : r.status === 'grace' ? ['결제 문제','b-wait'] : r.auto_renew ? ['이용 중','b-done'] : ['해지 예정','b-wait'];
+  const next = r => !r.expires_at ? '—' : ymd(r.expires_at) + (!live(r) ? ' 종료됨' : r.auto_renew ? ' 다음 결제' : ' 종료');
+  const rows = data.map(r => {
+    const [sl, sc] = state(r);
+    return el('tr', {},
+      el('td', {}, r.name || el('span', { class:'sub' }, r.user_id ? '(닉네임 없음)' : '(탈퇴한 회원)')),
+      el('td', {}, yearly(r) ? `연간 ${won(PRICE.yearly)}` : `월간 ${won(PRICE.monthly)}`),
+      el('td', {}, el('span', { class:'badge ' + sc }, sl)),
+      el('td', { class:'sub' }, next(r)),
+      el('td', { class:'sub' }, ymd(r.updated_at)),
+      el('td', { class:'sub' }, 'App Store'),
+      el('td', {}, el('span', { class:'badge b-plum' }, r.env === 'Sandbox' ? '샌드박스' : '실제 결제')),
+      el('td', { style:'text-align:right' }, r.user_id ? el('button', { class:'linkbtn', onclick: () => { tab = 'members'; openMember = r.user_id; render(); } }, '회원') : null));
+  });
+  const table = rows.length ? el('div', { class:'panel tablebox' }, el('table', {},
+      el('thead', {}, el('tr', {}, ['회원', '플랜', '상태', '다음 결제 · 종료', '마지막 변경', '결제', '환경', ''].map(h => el('th', {}, h)))), el('tbody', {}, rows)))
+    : el('div', { class:'panel empty' }, subsEnv === 'Sandbox' ? '테스트 결제 기록이 없어요.' : '아직 실제 결제한 구독이 없어요.');
+  const seg = el('div', { class:'seg' }, [['Production', '실제 결제'], ['Sandbox', '샌드박스']].map(([k, n]) =>
+    el('button', { class: subsEnv === k ? 'on' : '', onclick: () => { subsEnv = k; render(); } }, n)));
+  const asc = el('a', { class:'btn', href:'https://appstoreconnect.apple.com/apps/6834186422/distribution/subscriptions', target:'_blank', rel:'noopener' }, 'App Store Connect ↗');
+  const head = crumb('현황', () => { tab = 'stats'; render(); }, '구독');
+  return [el('div', { style:'display:flex;flex-direction:column;gap:14px' }, kpis, table,
+    el('p', { class:'note' }, '결제·환불·영수증은 Apple이 처리해요. 여기서는 상태만 확인하고, 변경은 App Store Connect에서 해요. 금액은 한국 가격으로 셈하고(미국 결제도 같은 값으로), 연간은 12로 나눠 월 환산해요. 이번 달 해지는 이번 달에 자동 갱신을 끄거나 끝난 구독이에요.')),
+    el('div', { class:'r' }, seg, asc), head];
 }
 
 async function errors() {
