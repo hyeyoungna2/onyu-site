@@ -135,7 +135,16 @@ thead tr { border:0; }
 .kpi { display:flex; flex-direction:column; gap:4px; padding:0 28px; border-right:1px solid var(--row); }
 .kpi.last { border-right:0; } .kpi .sub { font-size:13px; } .kpi small { color:#B3AEC4; font-size:13px; } .kpi b { font-size:22px; font-weight:600; }
 a.btn { text-decoration:none; }
+.kgrid { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; }
+.kcard { padding:18px 20px; display:flex; flex-direction:column; gap:6px; min-width:0; }
+.kcard .sub { font-size:13px; } .kcard b { font-size:30px; font-weight:600; line-height:1.1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .kcard small { font-size:12px; min-height:14px; }
+.mono { font-family:ui-monospace, Menlo, monospace; font-size:12.5px; }
+tr.hot td { background:#F7F5FB; }
+.trace { margin:0; padding:16px; border-radius:12px; background:#2A2640; color:#D9D3EA; font-size:12px; line-height:1.7; white-space:pre-wrap; word-break:break-word; font-family:ui-monospace, Menlo, monospace; }
+.detail.err { grid-template-columns:1fr 340px; }
+.seg.wide { align-self:stretch; display:flex; } .seg.wide button { flex:1; }
 @media (max-width:860px) {
+  .kgrid { grid-template-columns:1fr 1fr; } .detail.err { grid-template-columns:1fr; }
   .kpis { grid-template-columns:1fr 1fr; row-gap:18px; } .kpi { border-right:0; padding:0 20px; }
   .tablebox th, .tablebox td { white-space:nowrap; } .ell { max-width:200px; }
   .search { width:100%; } .head .r { flex-wrap:wrap; }
@@ -169,7 +178,7 @@ const ICON = {
   errors:'<path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18.6A2 2 0 0 0 3.5 21.6h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
 };
 const $app = document.getElementById('app');
-let tab = 'stats', who = '', counts = { open_reports: 0, errors_24h: 0 }, repFilter = 'open', openReport = null, memFilter = 'all', memQ = '', openMember = null, subsEnv = 'Production';
+let tab = 'stats', who = '', counts = { open_reports: 0, errors_24h: 0 }, repFilter = 'open', openReport = null, memFilter = 'all', memQ = '', openMember = null, subsEnv = 'Production', errDays = 1, openError = null;
 
 function el(tag, attrs, ...kids) {
   const e = document.createElement(tag);
@@ -222,7 +231,7 @@ async function start() {
 }
 
 function shell(title, body, extra) {
-  const nav = (k, name, n) => el('button', { class:'nav' + (tab === k || (k === 'stats' && (tab === 'members' || tab === 'subs')) ? ' on' : ''), onclick: () => { tab = k; openReport = null; openMember = null; render(); } },
+  const nav = (k, name, n) => el('button', { class:'nav' + (tab === k || (k === 'stats' && (tab === 'members' || tab === 'subs')) ? ' on' : ''), onclick: () => { tab = k; openReport = null; openMember = null; openError = null; render(); } },
     svg(ICON[k]), name, n ? el('span', { class:'count' }, n) : null);
   const aside = el('aside', {},
     el('div', { class:'brand' }, el('img', { src:'logo.png', alt:'ONYU' }), el('span', {}, '관리자')),
@@ -237,10 +246,10 @@ function shell(title, body, extra) {
 }
 
 async function render() {
-  const title = tab === 'stats' ? '현황' : tab === 'errors' ? '앱 오류' : tab === 'members' ? '회원' : tab === 'subs' ? '구독' : openReport ? '신고 처리' : '신고';
+  const title = tab === 'stats' ? '현황' : tab === 'errors' ? (openError ? '오류 상세' : '앱 오류') : tab === 'members' ? '회원' : tab === 'subs' ? '구독' : openReport ? '신고 처리' : '신고';
   shell(title, el('p', { class:'note' }, '불러오는 중…'));
   try {
-    const [body, extra, head] = await (tab === 'stats' ? stats() : tab === 'errors' ? errors() : tab === 'subs' ? subs() : tab === 'members' ? (openMember ? memberDetail(openMember) : members())
+    const [body, extra, head] = await (tab === 'stats' ? stats() : tab === 'errors' ? (openError ? errorDetail(openError) : errors()) : tab === 'subs' ? subs() : tab === 'members' ? (openMember ? memberDetail(openMember) : members())
       : openReport ? reportDetail(openReport) : reports());
     shell(head || title, body, extra);
     if (tab === 'members' && !openMember && memFocus) { const i = document.querySelector('.search input'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
@@ -496,17 +505,88 @@ async function subs() {
     el('div', { class:'r' }, seg, asc), head];
 }
 
+const SCREEN = { upload:'사진·영상 올리기', video:'영상 담기', kakao:'카카오톡 공유', purchase:'결제 확인' };
+const ERR = { open:['미해결','b-wait'], again:['다시 발생','b-wait'], seen:['확인함','b-plum'], fixed:['해결됨','b-done'] };
+const CRASH = '앱이 튕긴 것(크래시)은 여기 오지 않아요: Xcode → Window → Organizer → Crashes 에서 봐요.';
+
 async function errors() {
-  const { data, error } = await sb.rpc('admin_errors', { p_days: 7 }); if (error) throw error;
-  const crash = '앱이 튕긴 것(크래시)은 여기 오지 않아요: Xcode → Window → Organizer → Crashes 에서 봐요.';
-  if (!data.length) return [el('div', { style:'display:flex;flex-direction:column;gap:12px' },
-    el('div', { class:'panel empty' }, '최근 7일 동안 앱 오류가 없어요.'), el('p', { class:'note' }, crash)), null];
-  return [el('div', { style:'display:flex;flex-direction:column;gap:12px' },
-    el('div', { class:'panel tablebox' }, el('table', {},
-      el('tr', {}, ['종류', '내용', '횟수', '사람', '마지막', '앱·OS'].map(h => el('th', {}, h))),
-      data.map(e => el('tr', {}, el('td', {}, el('span', { class:'badge b-plum' }, e.kind)), el('td', {}, e.message || ''), el('td', {}, e.count),
-        el('td', {}, e.users), el('td', { style:'white-space:nowrap' }, stamp(e.last_at)), el('td', { class:'sub' }, [e.app_ver, e.os].filter(Boolean).join(' · ')))))),
-    el('p', { class:'note' }, '최근 7일, 같은 오류끼리 묶었어요. ' + crash)), null];
+  const calls = [sb.rpc('admin_error_list', { p_days: errDays })];
+  if (errDays !== 1) calls.push(sb.rpc('admin_error_list', { p_days: 1 }));
+  if (errDays !== 7) calls.push(sb.rpc('admin_error_list', { p_days: 7 }));
+  const res = await Promise.all(calls);
+  for (const r of res) if (r.error) throw r.error;
+  const list = res[0].data, pick = d => d === errDays ? list : res[1 + (errDays !== 1 && d === 7 ? 1 : 0)].data;
+  const sum = rows => rows.reduce((a, r) => a + Number(r.count), 0);
+  const d1 = sum(pick(1)), d7 = sum(pick(7));
+  counts.errors_24h = d1;
+  const byKind = {}; list.forEach(r => byKind[r.kind] = (byKind[r.kind] || 0) + Number(r.count));
+  const top = Object.entries(byKind).sort((a, b) => b[1] - a[1])[0];
+  const card = (k, v, sub) => el('div', { class:'panel kcard' }, el('span', { class:'sub' }, k), el('b', {}, v), el('small', { class:'sub' }, sub || ' '));
+  const kpis = el('div', { class:'kgrid' }, card('24시간 발생', d1), card('7일 발생', d7),
+    card('영향받은 사용자', list.length ? list[0].users_all : 0, errDays === 1 ? '24시간' : errDays === 7 ? '7일' : '90일'),
+    card('가장 많은 화면', top ? (SCREEN[top[0]] || top[0]) : '—', top ? `${top[1]}회` : null));
+  const go = r => { openError = { kind: r.kind, message: r.message }; render(); };
+  const rows = list.map(r => {
+    const [sl, sc] = ERR[r.status] || ERR.open;
+    return el('tr', { class:'click' + (['open', 'again'].includes(r.status) ? ' hot' : ''), onclick: () => go(r) },
+      el('td', { class:'sub', style:'white-space:nowrap' }, hm(r.last_at)),
+      el('td', { class:'sub', style:'white-space:nowrap' }, [r.os, r.app_ver].filter(Boolean).join(' · ') || '—'),
+      el('td', {}, el('span', { class:'badge b-plum' }, SCREEN[r.kind] || r.kind)),
+      el('td', { class:'ell mono' }, r.message || '(메시지 없음)'),
+      el('td', { style:'text-align:center' }, r.count),
+      el('td', { class:'sub' }, r.last_user + (r.users > 1 ? ` 외 ${r.users - 1}명` : '')),
+      el('td', {}, el('span', { class:'badge ' + sc }, sl)),
+      el('td', { style:'text-align:right' }, el('button', { class:'linkbtn', onclick: e => { e.stopPropagation(); go(r); } }, '보기')));
+  });
+  const table = rows.length ? el('div', { class:'panel tablebox' }, el('table', {},
+      el('thead', {}, el('tr', {}, ['마지막 발생', '환경', '화면', '메시지', '횟수', '사용자', '상태', ''].map((h, i) => el('th', i === 4 ? { style:'text-align:center' } : {}, h)))), el('tbody', {}, rows)))
+    : el('div', { class:'panel empty' }, { 1:'최근 24시간 동안 앱 오류가 없어요.', 7:'최근 7일 동안 앱 오류가 없어요.', 90:'최근 90일 동안 앱 오류가 없어요.' }[errDays]);
+  const seg = el('div', { class:'seg' }, [[1, '24시간'], [7, '7일'], [90, '전체']].map(([k, n]) =>
+    el('button', { class: errDays === k ? 'on' : '', onclick: () => { errDays = k; render(); } }, n)));
+  return [el('div', { style:'display:flex;flex-direction:column;gap:14px' }, kpis, table,
+    el('p', { class:'note' }, '같은 화면·같은 메시지는 한 줄로 묶어요. 전체는 최근 90일이에요. ' + CRASH)),
+    el('div', { class:'r' }, seg, el('span', { class:'stamp' }, '기준 ' + stamp(Date.now())))];
+}
+
+async function errorDetail(key) {
+  const { data:d, error } = await sb.rpc('admin_error_detail', { p_kind: key.kind, p_message: key.message });
+  if (error) throw error;
+  const back = el('button', { class:'linkbtn soft', onclick: () => { openError = null; render(); } }, '← 목록');
+  const [sl, sc] = ERR[d.status] || ERR.open;
+  const ev = d.events || [], last = ev[0] || {};
+  const pre = [d.message || '(메시지 없음)', '',
+    `화면: ${SCREEN[d.kind] || d.kind} (${d.kind})`,
+    d.first_at ? `처음 발생: ${stamp(d.first_at)} · 마지막 발생: ${stamp(d.last_at)}` : '발생 기록 없음',
+    last.os || last.app ? `최근 환경: ${[last.os, last.app ? 'ONYU ' + last.app : null].filter(Boolean).join(' · ')}` : null,
+    d.versions && d.versions.length ? `앱 버전: ${d.versions.join(', ')}` : null].filter(x => x !== null).join('\n');
+  const main = el('div', { class:'panel pad', style:'gap:12px' },
+    el('div', { class:'top' }, el('span', { class:'badge b-plum' }, SCREEN[d.kind] || d.kind), el('span', { class:'badge ' + sc }, sl),
+      el('span', { class:'sub', style:'margin-left:auto;font-size:12px' }, `${d.count}회 · 사용자 ${d.users}명`)),
+    el('span', { class:'mono', style:'font-size:15px;font-weight:500;word-break:break-word' }, d.message || '(메시지 없음)'),
+    el('pre', { class:'trace' }, pre));
+  const hist = el('div', { class:'panel pad', style:'gap:4px' }, el('span', { class:'h' }, '발생 기록' + (ev.length >= 50 ? ' (최근 50번)' : '')),
+    ev.length ? ev.map(e => el('div', { class:'hrow' },
+      el('span', {}, e.uid ? el('button', { class:'linkbtn', style:'font-weight:400;color:inherit', onclick: () => { tab = 'members'; openMember = e.uid; openError = null; render(); } }, e.who) : e.who,
+        ' · ' + ([e.os, e.app].filter(Boolean).join(' · ') || '환경 정보 없음')), el('span', { class:'sub' }, hm(e.at))))
+      : el('p', { class:'note' }, '기록이 없어요.'));
+  let pickS = d.status === 'again' ? 'open' : d.status;
+  const seg = el('div', { class:'seg wide' }, [['open', '미해결'], ['seen', '확인함'], ['fixed', '해결됨']].map(([k, n]) => {
+    const b = el('button', { class: pickS === k ? 'on' : '', onclick: () => { pickS = k; seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); } }, n);
+    return b;
+  }));
+  const memo = el('textarea', { placeholder:'메모 — 원인, 수정 버전 등', maxlength:'500' }); memo.value = d.note || '';
+  const save = async (all, btn) => {
+    btn.disabled = true;
+    const { error } = await sb.rpc('admin_error_mark', { p_kind: d.kind, p_message: d.message, p_status: all ? 'fixed' : pickS, p_note: memo.value, p_all_kind: !!all });
+    if (error) { alert('저장하지 못했어요: ' + error.message); btn.disabled = false; return; }
+    render();
+  };
+  const saveBtn = el('button', { class:'btn main big', onclick: e => save(false, e.currentTarget) }, '저장');
+  const allBtn = el('button', { class:'linkbtn soft', style:'align-self:center', onclick: e => { if (confirm(`'${SCREEN[d.kind] || d.kind}' 종류의 오류를 모두 해결됨으로 표시할까요?`)) save(true, e.currentTarget); } },
+    '같은 종류 오류 모두 해결됨으로 표시');
+  const side = el('div', { class:'panel pad side', style:'gap:14px' }, el('span', { class:'big' }, '상태'), seg, memo, saveBtn, allBtn,
+    d.triaged_at ? el('p', { class:'note' }, '마지막 저장 ' + stamp(d.triaged_at) + (d.status === 'again' ? ' · 해결됨으로 적은 뒤 다시 생겼어요' : '')) : null);
+  return [el('div', { class:'detail err' }, el('div', { class:'col' }, main, hist), side), back];
 }
 
 start();
