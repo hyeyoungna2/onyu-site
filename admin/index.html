@@ -575,7 +575,7 @@ async function memberDetail(id) {
     el('p', { class:'note' }, '플러스 선물 말고는 읽기만 하는 화면이에요. 일기는 가족과 함께 쓰는 아이의 일기 전체 개수예요.')), null, crumb('회원', back, d.name || (d.provider === 'guest' ? '손님' : '(닉네임 없음)'))];
 }
 
-const PRICE = { monthly: 4900, yearly: 48900 };   // 한국 App Store 가격 (원)
+const PRICE = { monthly: 1900, yearly: 19000 };   // 한국 App Store 가격 (원) — 2026-11-18 내림 (월 4,900 → 1,900, 연 48,900 → 19,000)
 const won = n => Math.round(n).toLocaleString('ko-KR') + '원';
 const ymd = t => new Date(t).toLocaleDateString('ko-KR', KST);
 
