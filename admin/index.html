@@ -113,6 +113,7 @@ thead tr { border:0; }
 .hrow:last-child { border-bottom:0; }
 tr.dim td { opacity:.45; }
 .ntphone { background:linear-gradient(180deg,#E4EDF8,#F9F2EC); border-radius:18px; padding:20px 18px; display:flex; flex-direction:column; gap:4px; color:#3F3A55; min-height:200px; }
+.ntpush { background:rgba(245,245,247,.9); border-radius:16px; padding:12px 14px; display:flex; flex-direction:column; gap:2px; font-size:13px; color:#1d1d1f; box-shadow:0 2px 10px rgba(0,0,0,.08); } .ntpush b { font-size:13px; }
 .ntdate { font-size:11px; color:#A39EB3; } .nttitle { font-size:15.5px; font-weight:500; } .nthr { height:1px; background:#fff; margin:10px 0 6px; }
 .ntblock p { margin:8px 0 0; font-size:13px; font-weight:300; white-space:pre-line; } .ntblock p.nth { font-weight:500; } .ntblock ul { margin:4px 0 0; padding-left:18px; font-size:13px; font-weight:300; }
 input.ntin, textarea.ntin { border:1px solid var(--line); border-radius:10px; padding:10px 12px; font:inherit; font-size:14px; background:#fff; color:var(--ink); }
@@ -782,8 +783,11 @@ async function notices() {
   if (ntEdit) {
     const t = el('input', { type:'text', class:'ntin', maxlength:'60', placeholder:'제목 (예: 온유 1.0.6 업데이트 안내)' }); t.value = ntEdit.title || '';
     const b = el('textarea', { rows:'16', class:'ntin', placeholder:'내용\n\n빈 줄로 문단을 나눠요.\n"- "로 시작하는 줄은 목록이 돼요.' }); b.value = ntEdit.body || '';
-    const pv = el('div', {}); const redraw = () => pv.replaceChildren(ntPreview(t.value, b.value)); t.oninput = b.oninput = redraw; redraw();
-    const save = async (btn) => { btn.disabled = true; const { data:id, error } = await sb.rpc('admin_notice_save', { p_id: ntEdit.id || null, p_title: t.value, p_body: b.value }); btn.disabled = false; if (error) { alert('저장하지 못했어요: ' + error.message); return null; } ntEdit.id = id; ntEdit.title = t.value; ntEdit.body = b.value; return id; };
+    const pt = el('input', { type:'text', class:'ntin', maxlength:'120', placeholder:'푸시 문구 (비우면 제목이 나가요)' }); pt.value = ntEdit.push_text || '';
+    const pv = el('div', {}); const pushPv = el('div', { class:'ntpush' });
+    const redraw = () => { pv.replaceChildren(ntPreview(t.value, b.value)); pushPv.replaceChildren(el('b', {}, '온유 소식'), el('span', {}, pt.value.trim() || t.value || '제목')); };
+    t.oninput = b.oninput = pt.oninput = redraw; redraw();
+    const save = async (btn) => { btn.disabled = true; const { data:id, error } = await sb.rpc('admin_notice_save', { p_id: ntEdit.id || null, p_title: t.value, p_body: b.value, p_push_text: pt.value }); btn.disabled = false; if (error) { alert('저장하지 못했어요: ' + error.message); return null; } ntEdit.id = id; ntEdit.title = t.value; ntEdit.body = b.value; ntEdit.push_text = pt.value; return id; };
     const push = el('input', { type:'checkbox' }); push.checked = true;
     const pub = async (btn) => { if (!t.value.trim()) { alert('제목을 써 주세요'); return; }
       if (!confirm(`이 공지를 앱에 게시할까요?` + (push.checked ? `\n소식·이벤트 알림을 켠 ${d.audience}명에게 푸시가 한 번 가요.` : '\n푸시는 보내지 않아요.'))) return;
@@ -791,15 +795,21 @@ async function notices() {
       const { data:r, error } = await sb.rpc('admin_notice_publish', { p_id: id, p_push: push.checked }); btn.disabled = false;
       if (error) { alert('게시하지 못했어요: ' + error.message); return; }
       alert('게시했어요' + (r.pushed_to ? ` · 푸시 ${r.pushed_to}명` : '')); ntEdit = null; render(); };
-    const editor = el('div', { class:'panel pad', style:'gap:10px' }, el('span', { class:'h' }, ntEdit.id ? '공지 고치기' : '새 공지'), t, b,
+    let testNick = ''; try { testNick = localStorage.getItem('ntTestNick') || ''; } catch (e) {}
+    const tn = el('input', { type:'text', class:'ntin', placeholder:'테스트로 받을 닉네임', style:'width:180px' }); tn.value = testNick;
+    const test = async (btn) => { if (!tn.value.trim()) { alert('테스트로 받을 계정의 닉네임을 써 주세요'); return; } try { localStorage.setItem('ntTestNick', tn.value.trim()); } catch (e) {}
+      const id = await save(btn); if (!id) return; btn.disabled = true; const { data:n, error } = await sb.rpc('admin_notice_test_push', { p_id: id, p_nick: tn.value.trim() }); btn.disabled = false;
+      alert(error ? '보내지 못했어요: ' + error.message : n ? `${tn.value.trim()}님 폰 ${n}대로 테스트 푸시를 보냈어요` : '그 계정에 푸시를 받는 폰이 없어요'); };
+    const editor = el('div', { class:'panel pad', style:'gap:10px' }, el('span', { class:'h' }, ntEdit.id ? '공지 고치기' : '새 공지'), t, b, pt,
+      el('div', { style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, tn, el('button', { class:'btn', onclick: e => test(e.currentTarget) }, '테스트 푸시 (그 계정에만)')),
       el('label', { class:'sub', style:'display:flex;gap:6px;align-items:center;font-size:13px' }, push, `게시할 때 푸시 보내기 (소식·이벤트 알림 켠 ${d.audience}명 · 아이폰만)`),
       el('div', { style:'display:flex;gap:8px;flex-wrap:wrap' },
         el('button', { class:'btn', onclick: async e => { if (await save(e.currentTarget)) alert('임시 저장했어요. 앱에는 아직 안 보여요.'); } }, '임시 저장'),
         el('button', { class:'btn main', onclick: e => pub(e.currentTarget) }, ntEdit.published_at ? '고친 내용 저장 (이미 게시됨)' : '게시하기'),
         el('button', { class:'btn', onclick: () => { ntEdit = null; render(); } }, '닫기')));
-    return [el('div', { class:'detail' }, el('div', { class:'col' }, editor), el('div', { class:'panel pad side', style:'gap:10px' }, el('span', { class:'h' }, '앱에서 이렇게 보여요'), pv)), null];
+    return [el('div', { class:'detail' }, el('div', { class:'col' }, editor), el('div', { class:'panel pad side', style:'gap:10px' }, el('span', { class:'h' }, '푸시는 이렇게 와요'), pushPv, el('span', { class:'h' }, '앱에서 이렇게 보여요'), pv)), null];
   }
-  const rows = list.map(n => el('tr', { class:'click', onclick: () => { ntEdit = { id: n.id, title: n.title, body: n.body, published_at: n.published_at }; render(); } },
+  const rows = list.map(n => el('tr', { class:'click', onclick: () => { ntEdit = { id: n.id, title: n.title, body: n.body, push_text: n.push_text, published_at: n.published_at }; render(); } },
     el('td', {}, n.published_at ? el('span', { class:'badge b-done' }, '게시됨') : el('span', { class:'badge b-skip' }, '임시 저장')),
     el('td', { class:'ell' }, n.title),
     el('td', { class:'sub', style:'white-space:nowrap' }, n.published_at ? stamp(n.published_at) : stamp(n.updated_at)),
