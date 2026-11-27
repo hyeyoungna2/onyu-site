@@ -199,9 +199,11 @@ const ICON = {
   errors:'<path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18.6A2 2 0 0 0 3.5 21.6h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
   board:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
   notices:'<path d="M4 10v4h3l5 4V6L7 10zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>',
+  opinions:'<path d="M4 9h11a4 4 0 0 1 4 4v7H4z"/><path d="M8 13h4M15 9V4h3"/>',
   agility:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"/>',
 };
 const $app = document.getElementById('app');
+let opFilter = 'new';   // 의견 우체통: new · read · all
 let agWeek = null, tab = 'stats', who = '', counts = { open_reports: 0, errors_24h: 0 }, repFilter = 'open', openReport = null, memFilter = 'all', memQ = '', openMember = null, subsEnv = 'Production', errDays = 1, openError = null, boardFilter = 'all', boardQ = '', boardMore = [], boardFocus = false, boardTimer = null;
 
 function el(tag, attrs, ...kids) {
@@ -259,7 +261,7 @@ function shell(title, body, extra) {
     svg(ICON[k]), name, n ? el('span', { class:'count' }, n) : null);
   const aside = el('aside', {},
     el('div', { class:'brand' }, el('img', { src:'logo.png', alt:'ONYU' }), el('span', {}, '관리자')),
-    nav('stats', '현황'), nav('reports', '신고', counts.open_reports), nav('board', '게시판'), nav('agility', '어질리티'), nav('notices', '공지'), nav('errors', '앱 오류', counts.errors_24h),
+    nav('stats', '현황'), nav('reports', '신고', counts.open_reports), nav('board', '게시판'), nav('agility', '어질리티'), nav('notices', '공지'), nav('opinions', '의견 우체통', counts.opinions), nav('errors', '앱 오류', counts.errors_24h),
     el('a', { class:'nav', href:'https://mail.google.com/mail/u/?authuser=onyu.help@gmail.com', target:'_blank', rel:'noopener' },
       svg('<path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/>'), '문의 메일함', el('span', { class:'ext' }, '↗')),
     el('div', { class:'grow', style:'flex:1' }),
@@ -277,6 +279,7 @@ function toHash() {
   if (tab === 'reports') return openReport ? '#report/' + openReport : '#reports/' + repFilter;
   if (tab === 'board') return '#board/' + boardFilter;
   if (tab === 'notices') return '#notices';
+  if (tab === 'opinions') return '#opinions/' + opFilter;
   if (tab === 'agility') return '#agility' + (agWeek ? '/' + agWeek : '');
   if (tab === 'errors') return openError ? '#error/' + encodeURIComponent(openError.kind) + '/' + encodeURIComponent(openError.message) : '#errors/' + errDays;
   return '';
@@ -291,6 +294,7 @@ function fromHash() {
   else if (k === 'report' && /^\d+$/.test(a || '')) { tab = 'reports'; openReport = Number(a); }
   else if (k === 'board') { tab = 'board'; boardFilter = ['all', 'reported', 'hidden'].includes(a) ? a : 'all'; }
   else if (k === 'notices') { tab = 'notices'; }
+  else if (k === 'opinions') { tab = 'opinions'; opFilter = ['new', 'read', 'all'].includes(a) ? a : 'new'; }
   else if (k === 'agility') { tab = 'agility'; agWeek = /^\d{4}-\d\d-\d\d$/.test(a || '') ? a : null; }
   else if (k === 'errors') { tab = 'errors'; errDays = [1, 7, 90].includes(Number(a)) ? Number(a) : 1; }
   else if (k === 'error' && a != null) { tab = 'errors'; openError = { kind: decodeURIComponent(a), message: decodeURIComponent(b || '') }; }
@@ -300,10 +304,10 @@ window.addEventListener('popstate', () => { if (ready) { fromHash(); render(true
 async function render(fromHistory) {
   const h = toHash();
   if (!fromHistory && (location.hash || '') !== h) history.pushState(null, '', h || location.pathname + location.search);
-  const title = tab === 'notices' ? '공지' : tab === 'agility' ? '어질리티' : tab === 'board' ? '게시판' : tab === 'stats' ? '현황' : tab === 'errors' ? (openError ? '오류 상세' : '앱 오류') : tab === 'members' ? '회원' : tab === 'subs' ? '구독' : openReport ? '신고 처리' : '신고';
+  const title = tab === 'opinions' ? '의견 우체통' : tab === 'notices' ? '공지' : tab === 'agility' ? '어질리티' : tab === 'board' ? '게시판' : tab === 'stats' ? '현황' : tab === 'errors' ? (openError ? '오류 상세' : '앱 오류') : tab === 'members' ? '회원' : tab === 'subs' ? '구독' : openReport ? '신고 처리' : '신고';
   shell(title, el('p', { class:'note' }, '불러오는 중…'));
   try {
-    const [body, extra, head] = await (tab === 'notices' ? notices() : tab === 'agility' ? agility() : tab === 'board' ? board() : tab === 'stats' ? stats() : tab === 'errors' ? (openError ? errorDetail(openError) : errors()) : tab === 'subs' ? subs() : tab === 'members' ? (openMember ? memberDetail(openMember) : members())
+    const [body, extra, head] = await (tab === 'opinions' ? opinions() : tab === 'notices' ? notices() : tab === 'agility' ? agility() : tab === 'board' ? board() : tab === 'stats' ? stats() : tab === 'errors' ? (openError ? errorDetail(openError) : errors()) : tab === 'subs' ? subs() : tab === 'members' ? (openMember ? memberDetail(openMember) : members())
       : openReport ? reportDetail(openReport) : reports());
     shell(head || title, body, extra);
     if (tab === 'board' && boardFocus) { const i = document.querySelector('.search input'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
@@ -777,6 +781,27 @@ function ntPreview(title, body) {
   return el('div', { class:'ntphone' }, el('span', { class:'ntdate' }, new Date().toLocaleDateString('en-CA', KST).replace(/-/g, '.')), el('b', { class:'nttitle' }, title || '제목'),
     el('div', { class:'nthr' }), ...ntBlocks(body).map(b => el('div', { class:'ntblock' }, b.head ? el('p', { class: b.items.length ? 'nth' : '' }, b.head) : null, b.items.length ? el('ul', {}, b.items.map(i => el('li', {}, i))) : null)));
 }
+// 의견 우체통 (1.0.6): notes people dropped in the plaza's mailbox — newest first; mark each as read
+async function opinions() {
+  const { data:d, error } = await sb.rpc('admin_opinions', { p_filter: opFilter }); if (error) throw error;
+  counts.opinions = d.unread;
+  const seg = el('div', { class:'seg' }, [['new', '안 읽음' + (d.unread ? ' ' + d.unread : '')], ['read', '읽음'], ['all', '전체']].map(([k, n]) =>
+    el('button', { class: opFilter === k ? 'on' : '', onclick: () => { opFilter = k; render(); } }, n)));
+  const mark = async (o, read) => { const { error } = await sb.rpc('admin_opinion_mark', { p_id: o.id, p_read: read }); if (error) { alert('바꾸지 못했어요: ' + error.message); return; } render(); };
+  const rows = d.list.map(o => el('tr', {},
+    el('td', { class:'sub', style:'white-space:nowrap;vertical-align:top' }, hm(o.at)),
+    el('td', { style:'white-space:pre-wrap;word-break:break-all' }, o.body),
+    el('td', { class:'sub', style:'white-space:nowrap;vertical-align:top' }, (o.nick || '닉네임 없음') + (o.app ? ' · v' + o.app : '')),
+    el('td', { style:'text-align:right;white-space:nowrap;vertical-align:top' }, o.read_at
+      ? el('button', { class:'linkbtn', onclick: () => mark(o, false) }, '안 읽음으로')
+      : el('button', { class:'btn', onclick: () => mark(o, true) }, '읽음'))));
+  const empty = { new:'새 의견이 없어요.', read:'읽은 의견이 없어요.', all:'아직 받은 의견이 없어요.' }[opFilter];
+  const body = rows.length ? el('div', { class:'panel tablebox' }, el('table', {},
+      el('thead', {}, el('tr', {}, ['받은 시각', '내용', '보낸 사람', ''].map(h => el('th', {}, h)))), el('tbody', {}, rows)))
+    : el('div', { class:'panel empty' }, empty);
+  return [body, el('div', { class:'r' }, seg)];
+}
+
 async function notices() {
   const { data:d, error } = await sb.rpc('admin_notices'); if (error) throw error;
   const list = d.list;
